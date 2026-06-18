@@ -1,0 +1,58 @@
+{
+  "name": "fix-my-comments",
+  "displayName": "Fix My Comments",
+  "description": "AI-powered task management and collaboration layer attached directly to source code.",
+  "version": "0.0.1",
+  "publisher": "fix-my-comments",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "comments",
+    "tasks",
+    "ai",
+    "collaboration",
+    "code-review"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "fixMyComments.helloWorld",
+        "title": "Hello World",
+        "category": "Fix My Comments"
+      }
+    ]
+  },
+  "scripts": {
+    "clean": "rimraf dist out",
+    "compile": "tsc -p ./",
+    "build": "npm run compile",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint -c eslint.config.mjs src",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run format:check && npm run build",
+    "prepare": "husky",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.95.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^16.5.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.61.1"
+  }
+}
