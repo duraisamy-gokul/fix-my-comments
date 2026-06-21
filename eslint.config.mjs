@@ -59,4 +59,14 @@ export default ts.config(
       ],
     },
   },
+  {
+    files: ['src/generated/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/consistent-type-assertions': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      'unused-imports/no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'off',
+    },
+  },
 );
