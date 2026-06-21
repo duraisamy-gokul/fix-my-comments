@@ -8,17 +8,17 @@ Plans are produced with the **Skulls MCP** workflow, following its phase-file co
 
 `Done`: `1` = done, `0` = not done.
 
-| #   | Sub-task                         | Plan                                           | Done |
-| --- | -------------------------------- | ---------------------------------------------- | ---- |
-| 01  | esbuild bundler & build setup    | [01-esbuild-bundler.md](01-esbuild-bundler.md) | 0    |
-| 02  | Sidebar view container (empty)   | _planned when picked_                          | 0    |
-| 03  | Type tooling + core domain types | _planned when picked_                          | 0    |
-| 04  | Local storage service            | _planned when picked_                          | 0    |
-| 05  | Create-task command              | _planned when picked_                          | 0    |
-| 06  | Floating action button           | _planned when picked_                          | 0    |
-| 07  | Keyboard shortcut                | _planned when picked_                          | 0    |
-| 08  | Persist task + root message      | _planned when picked_                          | 0    |
-| 09  | Populate sidebar from storage    | _planned when picked_                          | 0    |
-| 10  | Gutter decoration for open tasks | _planned when picked_                          | 0    |
+| #   | Sub-task                         | Plan                                                           | Done |
+| --- | -------------------------------- | -------------------------------------------------------------- | ---- |
+| 01  | esbuild bundler & build setup    | [01-esbuild-bundler.md](01-esbuild-bundler.md)                 | 0    |
+| 02  | Sidebar view container (empty)   | [02-sidebar-view.md](02-sidebar-view.md)                       | 0    |
+| 03  | Type tooling + core domain types | [03-type-tooling-core-types.md](03-type-tooling-core-types.md) | 0    |
+| 04  | Local storage service            | [04-local-storage-service.md](04-local-storage-service.md)     | 0    |
+| 05  | Create-task command              | [05-create-task-command.md](05-create-task-command.md)         | 0    |
+| 06  | Floating action button           | _planned when picked_                                          | 0    |
+| 07  | Keyboard shortcut                | _planned when picked_                                          | 0    |
+| 08  | Persist task + root message      | _planned when picked_                                          | 0    |
+| 09  | Populate sidebar from storage    | _planned when picked_                                          | 0    |
+| 10  | Gutter decoration for open tasks | _planned when picked_                                          | 0    |
 
 These roll up into the Phase 1 [checklist.md](../checklist.md).

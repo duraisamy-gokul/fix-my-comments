@@ -9,7 +9,8 @@ Make tasks survive code edits. Anchor a task to its selection using a text hash 
 In scope:
 
 - Anchor capture: selected text, text hash, char ranges, before/after context lines.
-- Staged recovery: hash match → exact text → context match.
+- Live range tracking: shift anchors as the document is edited while the file is open (document change events), so positions stay correct during an editing session — coordinates are a live cache, never the identity.
+- Staged recovery (when the file is reopened or changed externally): hash match → exact text → context match.
 - Anchor update after successful relocation.
 - Orphaned detection when recovery fails.
 - Selection overlap classification: exact match, partial overlap, fully inside.
@@ -29,10 +30,12 @@ flowchart TD
     D --> E[Update anchor after relocation]
     D --> F[Orphan detection + state]
     A --> G[Selection overlap classifier]
+    A --> H[Live range tracking while open]
 ```
 
 ## Acceptance Criteria
 
+- Inserting or deleting lines above an open file's anchor keeps the marker on the correct lines in real time.
 - Editing unrelated lines keeps the task attached.
 - Reformatting or moving the selected block relocates the anchor and updates it.
 - Deleting the selected code marks the task `orphaned`.

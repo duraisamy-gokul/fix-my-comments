@@ -30,10 +30,6 @@ These are the intended fields. The authoritative form will be the YAML spec auth
 
 `open` | `in_progress` | `resolved` | `blocked` | `requires_review` | `orphaned` | `closed`
 
-### TaskPriority
-
-`low` | `medium` | `high` | `urgent`
-
 ### TaskScope
 
 `selection` | `file` | `repo`
@@ -46,23 +42,22 @@ These are the intended fields. The authoritative form will be the YAML spec auth
 
 Lightweight metadata; thread and history are stored as separate append-only logs, not embedded. Anchor fields are minimal in Phase 1 and extended for durable recovery in Phase 2.
 
-| Field           | Type         | Notes                                      |
-| --------------- | ------------ | ------------------------------------------ |
-| `id`            | string       | Stable task id                             |
-| `schemaVersion` | integer      | For forward migration                      |
-| `title`         | string       |                                            |
-| `description`   | string       |                                            |
-| `scope`         | TaskScope    | selection / file / repo                    |
-| `status`        | TaskStatus   |                                            |
-| `priority`      | TaskPriority |                                            |
-| `createdBy`     | string       |                                            |
-| `createdAt`     | string       | ISO timestamp                              |
-| `updatedAt`     | string       | ISO timestamp                              |
-| `anchor`        | CodeAnchor   | Minimal in Phase 1; extended in Phase 2    |
-| `labels`        | string[]     | Inline, bounded                            |
-| `threadHead`    | string       | First message id                           |
-| `threadTail`    | string       | Newest message id                          |
-| `messageCount`  | integer      | For sidebar/hover without scanning the log |
+| Field           | Type       | Notes                                      |
+| --------------- | ---------- | ------------------------------------------ |
+| `id`            | string     | Stable task id                             |
+| `schemaVersion` | integer    | For forward migration                      |
+| `title`         | string     |                                            |
+| `description`   | string     |                                            |
+| `scope`         | TaskScope  | selection / file / repo                    |
+| `status`        | TaskStatus |                                            |
+| `createdBy`     | string     |                                            |
+| `createdAt`     | string     | ISO timestamp                              |
+| `updatedAt`     | string     | ISO timestamp                              |
+| `anchor`        | CodeAnchor | Minimal in Phase 1; extended in Phase 2    |
+| `labels`        | string[]   | Inline, bounded                            |
+| `threadHead`    | string     | First message id                           |
+| `threadTail`    | string     | Newest message id                          |
+| `messageCount`  | integer    | For sidebar/hover without scanning the log |
 
 ### CodeAnchor (Phase 1 minimal)
 

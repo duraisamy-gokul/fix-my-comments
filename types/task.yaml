@@ -1,0 +1,172 @@
+Task:
+  TaskStatus:
+    description: Lifecycle state of a task
+    type: string
+    enum:
+      - open
+      - in_progress
+      - resolved
+      - blocked
+      - requires_review
+      - orphaned
+      - closed
+
+  TaskScope:
+    description: What a task is attached to
+    type: string
+    enum:
+      - selection
+      - file
+      - repo
+
+  AuthorType:
+    description: Origin of a message
+    type: string
+    enum:
+      - user
+      - ai
+      - system
+
+  CodeAnchor:
+    description: Location a task is anchored to (minimal in Phase 1)
+    type: object
+    required: [filePath, startLine, endLine, startCharacter, endCharacter, selectedText]
+    properties:
+      filePath:
+        description: Workspace-relative file path
+        type: string
+      startLine:
+        description: Zero-based start line
+        type: number
+      endLine:
+        description: Zero-based end line
+        type: number
+      startCharacter:
+        description: Zero-based start character
+        type: number
+      endCharacter:
+        description: Zero-based end character
+        type: number
+      selectedText:
+        description: The text that was selected when the task was created
+        type: string
+
+  TaskMessage:
+    description: A single entry in a task thread (append-only log)
+    type: object
+    required: [id, taskId, seq, authorType, author, content, timestamp]
+    properties:
+      id:
+        description: Message identifier
+        type: string
+      taskId:
+        description: Owning task identifier
+        type: string
+      parentId:
+        description: Message being replied to (null for the root message)
+        type: string
+      seq:
+        description: Monotonic per-task order
+        type: number
+      authorType:
+        $ref: './types/task.yaml#/Task/AuthorType'
+      author:
+        description: Display name of the author
+        type: string
+      content:
+        description: Message body
+        type: string
+      timestamp:
+        description: ISO timestamp
+        type: string
+        format: date-time
+
+  TaskHistoryEvent:
+    description: A single entry in a task history log (append-only)
+    type: object
+    required: [id, taskId, seq, type, actor, timestamp]
+    properties:
+      id:
+        description: Event identifier
+        type: string
+      taskId:
+        description: Owning task identifier
+        type: string
+      seq:
+        description: Monotonic per-task order
+        type: number
+      type:
+        description: Event type (e.g. created, status_changed)
+        type: string
+      actor:
+        description: Who caused the event
+        type: string
+      timestamp:
+        description: ISO timestamp
+        type: string
+        format: date-time
+
+  Task:
+    description: A code-anchored task (lightweight record; thread/history stored separately)
+    type: object
+    required:
+      [
+        id,
+        schemaVersion,
+        title,
+        description,
+        scope,
+        status,
+        createdBy,
+        createdAt,
+        updatedAt,
+        anchor,
+        labels,
+        threadHead,
+        threadTail,
+        messageCount,
+      ]
+    properties:
+      id:
+        description: Task identifier
+        type: string
+      schemaVersion:
+        description: Schema version for forward migration
+        type: number
+      title:
+        description: Short task title
+        type: string
+      description:
+        description: Task description
+        type: string
+      scope:
+        $ref: './types/task.yaml#/Task/TaskScope'
+      status:
+        $ref: './types/task.yaml#/Task/TaskStatus'
+      createdBy:
+        description: Who created the task
+        type: string
+      createdAt:
+        description: ISO creation timestamp
+        type: string
+        format: date-time
+      updatedAt:
+        description: ISO last-update timestamp
+        type: string
+        format: date-time
+      anchor:
+        $ref: './types/task.yaml#/Task/CodeAnchor'
+      labels:
+        description: Freeform labels
+        type: array
+        items:
+          type: string
+      threadHead:
+        description: First message id in the thread
+        type: string
+      threadTail:
+        description: Newest message id in the thread
+        type: string
+      messageCount:
+        description: Number of messages in the thread
+        type: number

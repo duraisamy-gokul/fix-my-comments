@@ -23,9 +23,66 @@
   "contributes": {
     "commands": [
       {
-        "command": "fixMyComments.helloWorld",
-        "title": "Hello World",
+        "command": "fixMyComments.createTask",
+        "title": "Comment",
         "category": "Fix My Comments"
+      },
+      {
+        "command": "fixMyComments.submitComment",
+        "title": "Add Comment",
+        "category": "Fix My Comments",
+        "enablement": "!commentIsEmpty"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "fixMyComments.createTask",
+          "when": "editorHasSelection",
+          "group": "navigation@9"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "fixMyComments.submitComment",
+          "group": "inline",
+          "when": "commentController == fixMyComments"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "fixMyComments",
+          "title": "Fix My Comments",
+          "icon": "resources/fix-my-comments.svg"
+        }
+      ]
+    },
+    "views": {
+      "fixMyComments": [
+        {
+          "id": "fixMyComments.tasks",
+          "name": "Tasks"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "fixMyComments.tasks",
+        "contents": "No tasks yet.\nSelect code in the editor to create your first task."
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "fixMyComments.submitComment",
+        "key": "enter",
+        "when": "inCommentEditorInput"
+      },
+      {
+        "command": "lineBreakInsert",
+        "key": "shift+enter",
+        "when": "inCommentEditorInput"
       }
     ]
   },
@@ -55,7 +112,11 @@
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
+    "type-crafter": "^0.13.4",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.61.1"
+  },
+  "dependencies": {
+    "type-decoder": "^2.3.1"
   }
 }

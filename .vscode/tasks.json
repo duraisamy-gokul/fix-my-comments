@@ -6,7 +6,12 @@
       "script": "compile",
       "group": "build",
       "problemMatcher": [],
-      "label": "npm: compile"
+      "label": "npm: compile",
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "showReuseMessage": false
+      }
     },
     {
       "type": "npm",
