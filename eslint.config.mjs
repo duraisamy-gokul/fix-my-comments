@@ -38,6 +38,7 @@ export default ts.config(
           argsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       curly: ['error', 'all'],
       '@typescript-eslint/consistent-type-assertions': [
         'error',
@@ -64,6 +65,7 @@ export default ts.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/consistent-type-assertions': 'off',
+      '@typescript-eslint/consistent-type-definitions': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       'unused-imports/no-unused-vars': 'off',
       'unused-imports/no-unused-imports': 'off',

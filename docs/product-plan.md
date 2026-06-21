@@ -115,7 +115,6 @@ The task holds metadata and references the head/tail of its logs instead of embe
   "description": "Reduce duplication",
   "scope": "selection",
   "status": "open",
-  "priority": "medium",
   "createdBy": "user",
   "createdAt": "2026-06-18T00:00:00.000Z",
   "updatedAt": "2026-06-18T00:00:00.000Z",
@@ -379,7 +378,6 @@ Planned filters:
 - AI tasks
 - Human tasks
 - Labels
-- Priority
 - Scope: file, repo, selection
 
 ### 9. Thread Naming

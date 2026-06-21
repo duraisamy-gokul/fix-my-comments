@@ -1,0 +1,29 @@
+Storage:
+  WorkspaceIdentity:
+    description: Workspace identity derived from repo root and Git branch
+    type: object
+    required: [repoRoot, branch, key]
+    properties:
+      repoRoot:
+        description: Absolute path to the repository root
+        type: string
+      branch:
+        description: Current Git branch name
+        type: string
+      key:
+        description: Short SHA1 of repoRoot@branch used as the storage key
+        type: string
+
+  TaskFile:
+    description: Root shape of the tasks.json storage file
+    type: object
+    required: [schemaVersion, tasks]
+    properties:
+      schemaVersion:
+        description: Storage schema version
+        type: number
+      tasks:
+        description: All tasks for this workspace and branch
+        type: array
+        items:
+          $ref: './types/task.yaml#/Task/Task'
