@@ -4,7 +4,7 @@
 
 Select code. Attach a task. Discuss it with AI agents. Let them resolve it. Review the changes. Keep the full history — all without leaving the editor, and all stored locally per repository and branch.
 
-> 🚧 **Status: early development.** Phase 0 (project scaffold, tooling, CI hooks, planning) is complete. The features below describe the product being built across the [roadmap](docs/roadmap.md). This is the place to contribute from the ground up.
+> **Status: early development.** Phase 0 (project scaffold, tooling, CI hooks, planning) is complete. The features below describe the product being built across the [roadmap](docs/roadmap.md). This is the place to contribute from the ground up.
 
 ---
 
@@ -99,16 +99,18 @@ See the full design in **[docs/product-plan.md](docs/product-plan.md)**.
 
 The product is built in ordered phases, each a self-contained sub-product. Contributors pick subtasks within a phase and ship them as individual PRs.
 
-| Phase | Sub-product                                                           | Status |
-| ----- | --------------------------------------------------------------------- | ------ |
-| 0     | Repository Initialization                                             | ✅     |
-| 1     | [Local Task System](plans/phase-1-local-task-system/00-overview.md)   | ⬜     |
-| 2     | [Durable Anchoring](plans/phase-2-durable-anchoring/00-overview.md)   | ⬜     |
-| 3     | [Thread View](plans/phase-3-thread-view/00-overview.md)               | ⬜     |
-| 4     | [AI Agent Contract](plans/phase-4-ai-agent-contract/00-overview.md)   | ⬜     |
-| 5     | [AI Change Preview](plans/phase-5-ai-change-preview/00-overview.md)   | ⬜     |
-| 6     | [Git-Aware Recovery](plans/phase-6-git-aware-recovery/00-overview.md) | ⬜     |
-| 7     | [Scale & Marketplace](plans/phase-7-scale-marketplace/00-overview.md) | ⬜     |
+`Done`: `1` = done, `0` = not done.
+
+| Phase | Sub-product                                                           | Done |
+| ----- | --------------------------------------------------------------------- | ---- |
+| 0     | Repository Initialization                                             | 1    |
+| 1     | [Local Task System](plans/phase-1-local-task-system/00-overview.md)   | 0    |
+| 2     | [Durable Anchoring](plans/phase-2-durable-anchoring/00-overview.md)   | 0    |
+| 3     | [Thread View](plans/phase-3-thread-view/00-overview.md)               | 0    |
+| 4     | [AI Agent Contract](plans/phase-4-ai-agent-contract/00-overview.md)   | 0    |
+| 5     | [AI Change Preview](plans/phase-5-ai-change-preview/00-overview.md)   | 0    |
+| 6     | [Git-Aware Recovery](plans/phase-6-git-aware-recovery/00-overview.md) | 0    |
+| 7     | [Scale & Marketplace](plans/phase-7-scale-marketplace/00-overview.md) | 0    |
 
 Full roadmap with diagrams and progress tracker: **[docs/roadmap.md](docs/roadmap.md)**.
 

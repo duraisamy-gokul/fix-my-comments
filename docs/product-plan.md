@@ -553,7 +553,7 @@ The architecture should leave room for:
 
 ### Phase 0: Repository Initialization
 
-Status: in progress.
+Done: 1.
 
 Goals:
 
