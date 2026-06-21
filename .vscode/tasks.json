@@ -5,13 +5,21 @@
       "type": "npm",
       "script": "compile",
       "group": "build",
-      "problemMatcher": "$tsc"
+      "problemMatcher": [],
+      "label": "npm: compile"
+    },
+    {
+      "type": "npm",
+      "script": "check-types",
+      "group": "build",
+      "problemMatcher": "$tsc",
+      "label": "npm: check-types"
     },
     {
       "type": "npm",
       "script": "watch",
       "isBackground": true,
-      "problemMatcher": "$tsc-watch"
+      "problemMatcher": []
     }
   ]
 }

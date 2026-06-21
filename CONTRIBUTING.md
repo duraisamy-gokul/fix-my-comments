@@ -17,7 +17,7 @@ Roadmap  →  Phase (sub-product)  →  Subtask  →  Pull Request  →  Mark do
 
 Multiple people can work inside the same phase at once, as long as they pick different subtasks.
 
-## How Work Is Claimed (Avoiding Collisions)
+## How Work Is Claimed
 
 Every subtask is tracked as a **GitHub Issue**. To avoid two people doing the same work, claiming is a simple, visible convention:
 
@@ -27,7 +27,7 @@ The rule is simple: **claim before you code.**
 
 1. Open [docs/roadmap.md](docs/roadmap.md) and pick a phase that is not blocked.
 2. Open that phase's `checklist.md` in [`/plans`](plans) and find an unchecked subtask.
-3. Find (or open) the GitHub Issue for that subtask using the "Subtask" issue template.
+3. Find (or open) a GitHub Issue for that subtask.
 4. Before starting, check the issue:
    - Skim recent comments and linked pull requests. If someone has already commented that they are taking it, or there is an open PR, pick a different subtask.
    - Otherwise, comment **"Claiming this"** so others can see it is taken.
@@ -51,25 +51,27 @@ If a claimed issue shows no linked PR or activity for about **7 days**, treat it
 Branches use a conventional-commit type prefix with a slash (git branches can't contain spaces or start with a type-and-colon, so `/` is used):
 
 ```text
-<type>/phase-<n>-<short-subtask-slug>
+<type>/<short-subtask-slug>
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 
 Examples:
 
-- `feat/phase-1-storage-layer`
-- `fix/phase-2-anchor-hash-recovery`
-- `docs/phase-1-overview-tweak`
+- `feat/storage-layer`
+- `fix/anchor-hash-recovery`
+- `docs/overview-tweak`
+
+Don't put the phase in the branch or commit — work happens one phase at a time, so it adds nothing.
 
 ### Commit Messages and PR Titles
 
-Use [Conventional Commits](https://www.conventionalcommits.org/). The scope is the phase:
+Use [Conventional Commits](https://www.conventionalcommits.org/), no scope:
 
 ```text
-feat(phase-1): create task from selection command
-fix(phase-2): correct hash recovery on trimmed selection
-docs(roadmap): mark phase 1 storage subtask done
+feat: create task from selection command
+fix: correct hash recovery on trimmed selection
+docs: mark storage subtask done
 ```
 
 ## Local Development
@@ -95,11 +97,13 @@ Run the extension:
 ### Scripts
 
 ```bash
-npm run compile     # type-check and build to dist/
-npm run watch       # rebuild on change
-npm run lint        # ESLint
-npm run format      # Prettier (write)
-npm run check       # lint + format check + build (runs on pre-commit)
+npm run compile      # bundle to dist/ via esbuild (dev, with sourcemaps)
+npm run watch        # rebuild on change (esbuild watch)
+npm run check-types  # tsc type-check only (no emit)
+npm run build        # type-check + production bundle
+npm run lint         # ESLint
+npm run format       # Prettier (write)
+npm run check        # lint + format check + build (runs on pre-commit)
 npm run gen:types    # regenerate committed types from types/*.yaml (active once specs exist)
 ```
 
@@ -116,8 +120,6 @@ docs/
   roadmap.md          # phased roadmap with diagrams
 plans/
   phase-*/            # one sub-product plan per roadmap phase (overview + checklist)
-.github/
-  ISSUE_TEMPLATE/     # subtask issue template
 ```
 
 ## Required Checks
@@ -135,6 +137,32 @@ Format your code before committing:
 ```bash
 npm run format
 ```
+
+`npm run check` only proves the code **compiles** — it does not prove your change **works**. That is what testing is for.
+
+## Testing (Proof Is Required)
+
+**Every PR must include proof that the change works.** A PR without test proof will not be merged. "It compiles" and "checks pass" are not proof.
+
+What counts as proof depends on the change:
+
+- **User-visible behavior (commands, UI, decorations, sidebar):** a screenshot or short screen recording from the Extension Development Host showing the feature working, plus the exact steps you ran.
+- **Non-visible logic (storage, anchoring, parsing):** either an automated test, or a small temporary script / command output pasted into the PR showing the expected result. Describe what you ran and what you observed.
+- **Build/tooling changes:** the relevant command output (e.g. `npm run build`) and confirmation the extension still loads.
+
+Put this in a **"Testing"** section of the PR description.
+
+### How to Test the Extension Manually
+
+1. Run `npm install` and `npm run compile`.
+2. Launch the **Extension Development Host**:
+   - Open the Run and Debug view (`Cmd+Shift+D` / `Ctrl+Shift+D`) and click the green ▶ **Run Extension**, or
+   - press `F5` (on macOS, if `F5` triggers Dictation, use `fn`+`F5` or the green ▶ button instead).
+   - This opens a second VS Code window with the extension loaded.
+3. In that window, exercise your change. As a baseline smoke test, open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **"Fix My Comments: Hello World"** — you should see the notification _"Fix My Comments is ready."_
+4. Capture the result (screenshot / recording / output) for the PR.
+
+> There is no automated test suite yet — it arrives in Phase 7. Until then, manual proof in the PR is mandatory. When you add logic that can be unit-tested, prefer adding a test over a manual screenshot.
 
 ## Types (Planned, Not Yet Generated)
 
@@ -161,12 +189,22 @@ Until a phase introduces the type tooling, do not author type YAML or generated 
 - Prettier for formatting (config in `.prettierrc`).
 - Code should be self-explanatory. Only comment non-obvious behavior.
 
+### Naming Conventions
+
+- **Variables, parameters, functions, methods:** `camelCase` (e.g. `taskId`, `createTask`).
+- **Types, interfaces, classes, enums:** `PascalCase` (e.g. `TaskMessage`, `CodeAnchor`).
+- **Constants (true compile-time constants):** `UPPER_SNAKE_CASE` (e.g. `STORAGE_VERSION`).
+- **Files:** `kebab-case.ts` for modules (e.g. `task-store.ts`); `PascalCase.ts` only for generated type files (e.g. `Task.ts`).
+- **Booleans:** prefix with `is` / `has` / `should` / `can` (e.g. `isOrphaned`, `hasThread`).
+- No abbreviations that aren't already common in the codebase; prefer clear full words.
+
 ## Pull Request Checklist
 
 Before requesting review, confirm:
 
 - [ ] The PR implements exactly one subtask.
 - [ ] `npm run check` passes.
+- [ ] **The PR description has a "Testing" section with proof the change works** (screenshot / recording / command output + steps).
 - [ ] If types changed, the regenerated `src/generated/` output was committed alongside the YAML.
 - [ ] The subtask is checked off in the phase `checklist.md`.
 - [ ] Roadmap status updated if this completed the phase.
