@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Roadmap
+    url: https://github.com/fix-my-comments/fix-my-comments/blob/release/docs/roadmap.md
+    about: See all phases and pick a subtask to work on.
