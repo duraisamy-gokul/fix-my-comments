@@ -32,9 +32,55 @@
         "title": "Add Comment",
         "category": "Fix My Comments",
         "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "fixMyComments.openTask",
+        "title": "Go to Code",
+        "category": "Fix My Comments",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "fixMyComments.resolveTask",
+        "title": "Resolve",
+        "category": "Fix My Comments",
+        "icon": "$(pass)"
+      },
+      {
+        "command": "fixMyComments.reopenTask",
+        "title": "Reopen",
+        "category": "Fix My Comments",
+        "icon": "$(issue-reopened)"
+      },
+      {
+        "command": "fixMyComments.blockTask",
+        "title": "Block",
+        "category": "Fix My Comments",
+        "icon": "$(circle-slash)"
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "fixMyComments.submitComment",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.openTask",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.resolveTask",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.reopenTask",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.blockTask",
+          "when": "false"
+        }
+      ],
       "editor/context": [
         {
           "command": "fixMyComments.createTask",
@@ -47,6 +93,45 @@
           "command": "fixMyComments.submitComment",
           "group": "inline",
           "when": "commentController == fixMyComments"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "fixMyComments.resolveTask",
+          "group": "inline@1",
+          "when": "commentController == fixMyComments"
+        },
+        {
+          "command": "fixMyComments.reopenTask",
+          "group": "inline@2",
+          "when": "commentController == fixMyComments"
+        },
+        {
+          "command": "fixMyComments.blockTask",
+          "group": "inline@3",
+          "when": "commentController == fixMyComments"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "fixMyComments.openTask",
+          "group": "inline@1",
+          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
+        },
+        {
+          "command": "fixMyComments.resolveTask",
+          "group": "1_status@1",
+          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
+        },
+        {
+          "command": "fixMyComments.reopenTask",
+          "group": "1_status@2",
+          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
+        },
+        {
+          "command": "fixMyComments.blockTask",
+          "group": "1_status@3",
+          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
         }
       ]
     },
