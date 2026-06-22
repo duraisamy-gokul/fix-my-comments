@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 import { TaskStore } from '../storage/task-store';
 import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import type { Task } from '../generated';
+import { buildAnchor } from '../anchoring/anchor-capture';
+import type { CodeAnchor, Task } from '../generated';
 import type { TasksViewProvider } from '../views/tasks-view';
 
 export class FixMyCommentsController implements vscode.Disposable {
@@ -20,7 +21,7 @@ export class FixMyCommentsController implements vscode.Disposable {
     };
     this.controller.options = {
       prompt: 'Add a comment',
-      placeHolder: 'What needs attention here? (Ctrl+Enter to submit)',
+      placeHolder: 'What needs attention here? (Enter to submit, Shift+Enter for a new line)',
     };
   }
 
@@ -30,18 +31,17 @@ export class FixMyCommentsController implements vscode.Disposable {
       void vscode.window.showWarningMessage('Select code in the editor to add a comment.');
       return;
     }
-    void this.doOpenThread(editor);
+    void this.openWidgetAtSelection(editor);
   }
 
-  private async doOpenThread(editor: vscode.TextEditor): Promise<void> {
+  private async openWidgetAtSelection(editor: vscode.TextEditor): Promise<void> {
     const { document, selection } = editor;
-
     await vscode.window.showTextDocument(document, {
       preserveFocus: false,
       selection,
       viewColumn: editor.viewColumn ?? vscode.ViewColumn.Active,
     });
-
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
     await vscode.commands.executeCommand('workbench.action.addComment');
   }
 
@@ -65,28 +65,42 @@ export class FixMyCommentsController implements vscode.Disposable {
       return;
     }
 
-    const document = vscode.workspace.textDocuments.find(
-      (doc) => doc.uri.toString() === thread.uri.toString(),
-    );
-    const task = buildTask(trimmed, thread, document);
     const store = new TaskStore(this.context.globalStorageUri, identity);
-    await store.saveTask(task);
+    const existingId = thread.contextValue;
 
-    thread.comments = [
-      {
-        author: { name: 'You' },
-        body: new vscode.MarkdownString(trimmed),
-        mode: vscode.CommentMode.Preview,
-      },
-    ];
+    if (existingId != null && existingId.length > 0) {
+      const tasks = await store.listTasks();
+      const task = tasks.find((t) => t.id === existingId);
+      if (task != null) {
+        await store.saveTask({ ...task, updatedAt: new Date().toISOString() });
+      }
+    } else {
+      const document = vscode.workspace.textDocuments.find(
+        (doc) => doc.uri.toString() === thread.uri.toString(),
+      );
+      const task = buildTask(trimmed, thread, document);
+      await store.saveTask(task);
+      thread.contextValue = task.id;
+    }
+
+    thread.comments = [...thread.comments, previewComment(trimmed)];
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
-
     this.tasksProvider.refresh();
+
+    await vscode.commands.executeCommand('workbench.action.focusCommentsPanel');
   }
 
   dispose(): void {
     this.controller.dispose();
   }
+}
+
+function previewComment(body: string): vscode.Comment {
+  return {
+    author: { name: 'You' },
+    body: new vscode.MarkdownString(body),
+    mode: vscode.CommentMode.Preview,
+  };
 }
 
 function buildTask(
@@ -102,6 +116,21 @@ function buildTask(
   const snippet = selectedText.length > 40 ? `${selectedText.slice(0, 40)}...` : selectedText;
   const now = new Date().toISOString();
 
+  const anchor: CodeAnchor =
+    document != null
+      ? buildAnchor(document, range)
+      : {
+          filePath,
+          startLine: range.start.line,
+          endLine: range.end.line,
+          startCharacter: range.start.character,
+          endCharacter: range.end.character,
+          selectedText: '',
+          textHash: null,
+          beforeContext: null,
+          afterContext: null,
+        };
+
   return {
     id: `task_${randomUUID()}`,
     schemaVersion: 1,
@@ -112,14 +141,7 @@ function buildTask(
     createdBy: 'user',
     createdAt: now,
     updatedAt: now,
-    anchor: {
-      filePath,
-      startLine: range.start.line,
-      endLine: range.end.line,
-      startCharacter: range.start.character,
-      endCharacter: range.end.character,
-      selectedText: document != null ? document.getText(range) : '',
-    },
+    anchor,
     labels: [],
     threadHead: '',
     threadTail: '',

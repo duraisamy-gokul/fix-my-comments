@@ -28,7 +28,7 @@ Task:
       - system
 
   CodeAnchor:
-    description: Location a task is anchored to (minimal in Phase 1)
+    description: Location a task is anchored to
     type: object
     required: [filePath, startLine, endLine, startCharacter, endCharacter, selectedText]
     properties:
@@ -50,6 +50,19 @@ Task:
       selectedText:
         description: The text that was selected when the task was created
         type: string
+      textHash:
+        description: SHA-256 hex digest (first 16 chars) of selectedText
+        type: string
+      beforeContext:
+        description: Up to 3 lines immediately before the selection in document order
+        type: array
+        items:
+          type: string
+      afterContext:
+        description: Up to 3 lines immediately after the selection in document order
+        type: array
+        items:
+          type: string
 
   TaskMessage:
     description: A single entry in a task thread (append-only log)

@@ -1,14 +1,18 @@
 import * as vscode from 'vscode';
 import { TaskStore } from '../storage/task-store';
 import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
+import { AnchorTracker } from '../anchoring/anchor-tracker';
 import type { Task } from '../generated';
 
 export class GutterDecorator implements vscode.Disposable {
   private readonly decorationType: vscode.TextEditorDecorationType;
-  private readonly disposable: vscode.Disposable;
+  private readonly disposables: vscode.Disposable[] = [];
   private cachedTasks: Task[] | null = null;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly tracker: AnchorTracker,
+  ) {
     this.decorationType = vscode.window.createTextEditorDecorationType({
       gutterIconPath: context.asAbsolutePath('resources/gutter-comment.svg'),
       gutterIconSize: 'contain',
@@ -19,11 +23,19 @@ export class GutterDecorator implements vscode.Disposable {
       void this.applyToEditor(current);
     }
 
-    this.disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor != null) {
-        void this.applyToEditor(editor);
-      }
-    });
+    this.disposables.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (editor != null) {
+          void this.applyToEditor(editor);
+        }
+      }),
+      vscode.workspace.onDidChangeTextDocument((event) => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor != null && editor.document === event.document) {
+          this.applyFromTracker(editor);
+        }
+      }),
+    );
   }
 
   refresh(): void {
@@ -34,7 +46,24 @@ export class GutterDecorator implements vscode.Disposable {
     }
   }
 
+  private applyFromTracker(editor: vscode.TextEditor): void {
+    const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+    if (!this.tracker.isTracked(filePath)) {
+      return;
+    }
+    const liveRanges = this.tracker.getAllLiveRanges(filePath);
+    editor.setDecorations(this.decorationType, [...liveRanges.values()]);
+  }
+
   private async applyToEditor(editor: vscode.TextEditor): Promise<void> {
+    const filePath = vscode.workspace.asRelativePath(editor.document.uri);
+
+    if (this.tracker.isTracked(filePath)) {
+      const liveRanges = this.tracker.getAllLiveRanges(filePath);
+      editor.setDecorations(this.decorationType, [...liveRanges.values()]);
+      return;
+    }
+
     if (this.cachedTasks == null) {
       const identity = await resolveWorkspaceIdentity();
       if (identity == null) {
@@ -45,7 +74,6 @@ export class GutterDecorator implements vscode.Disposable {
       this.cachedTasks = await store.listTasks();
     }
 
-    const filePath = vscode.workspace.asRelativePath(editor.document.uri);
     const ranges = this.cachedTasks
       .filter((t) => t.anchor.filePath === filePath && t.status === 'open')
       .map((t) => new vscode.Range(t.anchor.startLine, 0, t.anchor.endLine, 0));
@@ -55,6 +83,8 @@ export class GutterDecorator implements vscode.Disposable {
 
   dispose(): void {
     this.decorationType.dispose();
-    this.disposable.dispose();
+    for (const d of this.disposables) {
+      d.dispose();
+    }
   }
 }

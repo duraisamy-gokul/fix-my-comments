@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { FixMyCommentsController } from './comments/comment-controller';
 import { CommentCodeLensProvider } from './comments/comment-lens';
+import { AnchorEngine } from './anchoring/anchor-engine';
+import { AnchorTracker } from './anchoring/anchor-tracker';
 import { GutterDecorator } from './decorations/gutter-decorator';
 import { TasksViewProvider } from './views/tasks-view';
 import type { Task } from './generated';
@@ -9,7 +11,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const tasksProvider = new TasksViewProvider(context);
   const tasksView = vscode.window.registerTreeDataProvider('fixMyComments.tasks', tasksProvider);
 
-  const gutterDecorator = new GutterDecorator(context);
+  const tracker = new AnchorTracker();
+  const engine = new AnchorEngine(context, tracker, tasksProvider);
+
+  const gutterDecorator = new GutterDecorator(context, tracker);
   const gutterSync = tasksProvider.onDidChangeTreeData(() => gutterDecorator.refresh());
 
   const codeLensProvider = new CommentCodeLensProvider();
@@ -48,6 +53,8 @@ export function activate(context: vscode.ExtensionContext): void {
     tasksView,
     tasksProvider,
     fmcController,
+    tracker,
+    engine,
     gutterDecorator,
     gutterSync,
     codeLensProvider,
