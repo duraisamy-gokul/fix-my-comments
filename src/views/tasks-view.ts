@@ -40,12 +40,12 @@ export class TaskTreeItem extends vscode.TreeItem {
     const fileName = filePath.split('/').pop() ?? filePath;
     const line = task.anchor.startLine + 1;
     const isOrphaned = task.status === 'orphaned';
+    const location = `${fileName}:${line}`;
 
-    this.description = isOrphaned ? `${fileName}:${line} (orphaned)` : `${fileName}:${line}`;
+    this.description = task.status === 'open' ? location : `${location} · ${task.status}`;
     this.tooltip = task.description.length > 0 ? task.description : task.title;
-    this.iconPath = isOrphaned
-      ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'))
-      : new vscode.ThemeIcon('comment');
+    this.iconPath = iconForStatus(task.status);
+    this.contextValue = 'fmcTask';
 
     if (!isOrphaned) {
       this.command = {
@@ -54,5 +54,24 @@ export class TaskTreeItem extends vscode.TreeItem {
         arguments: [task],
       };
     }
+  }
+}
+
+function iconForStatus(status: Task['status']): vscode.ThemeIcon {
+  switch (status) {
+    case 'resolved':
+      return new vscode.ThemeIcon('pass-filled', new vscode.ThemeColor('charts.green'));
+    case 'closed':
+      return new vscode.ThemeIcon('pass');
+    case 'blocked':
+      return new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('charts.red'));
+    case 'in_progress':
+      return new vscode.ThemeIcon('sync');
+    case 'requires_review':
+      return new vscode.ThemeIcon('eye');
+    case 'orphaned':
+      return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
+    default:
+      return new vscode.ThemeIcon('comment');
   }
 }

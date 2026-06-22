@@ -97,7 +97,7 @@ Plan: [`plans/phase-7-scale-marketplace`](../plans/phase-7-scale-marketplace/00-
 | 0     | Repository Init     | 1    | —             |
 | 1     | Local Task System   | 1    | 9 / 9         |
 | 2     | Durable Anchoring   | 1    | 7 / 8 (1 cut) |
-| 3     | Thread View         | 0    | 0 / 6         |
+| 3     | Thread View         | 1    | 6 / 6         |
 | 4     | AI Agent Contract   | 0    | 0 / 5         |
 | 5     | AI Change Preview   | 0    | 0 / 4         |
 | 6     | Git-Aware Recovery  | 0    | 0 / 4         |

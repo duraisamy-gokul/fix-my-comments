@@ -1,4 +1,11 @@
-import { type Task, decodeTask } from './Task';
+import {
+  type Task,
+  decodeTask,
+  type TaskMessage,
+  decodeTaskMessage,
+  type TaskHistoryEvent,
+  decodeTaskHistoryEvent,
+} from './Task';
 import {
   isJSON,
   decodeString,
@@ -84,6 +91,78 @@ export function decodeTaskFile(rawInput: unknown): TaskFile | null {
     return {
       schemaVersion: decodedSchemaVersion,
       tasks: decodedTasks,
+    };
+  }
+  return null;
+}
+
+/**
+ * @type { MessageFile }
+ * @description Root shape of the messages.json storage file
+ */
+export type MessageFile = {
+  /**
+   * @description Storage schema version
+   * @type { number }
+   * @memberof MessageFile
+   */
+  schemaVersion: number;
+  /**
+   * @description All thread messages across tasks for this workspace and branch
+   * @type { TaskMessage[] }
+   * @memberof MessageFile
+   */
+  messages: TaskMessage[];
+};
+
+export function decodeMessageFile(rawInput: unknown): MessageFile | null {
+  if (isJSON(rawInput)) {
+    const decodedSchemaVersion = decodeNumber(rawInput['schemaVersion']);
+    const decodedMessages = decodeArray(rawInput['messages'], decodeTaskMessage);
+
+    if (decodedSchemaVersion === null || decodedMessages === null) {
+      return null;
+    }
+
+    return {
+      schemaVersion: decodedSchemaVersion,
+      messages: decodedMessages,
+    };
+  }
+  return null;
+}
+
+/**
+ * @type { HistoryFile }
+ * @description Root shape of the history.json storage file
+ */
+export type HistoryFile = {
+  /**
+   * @description Storage schema version
+   * @type { number }
+   * @memberof HistoryFile
+   */
+  schemaVersion: number;
+  /**
+   * @description All history events across tasks for this workspace and branch
+   * @type { TaskHistoryEvent[] }
+   * @memberof HistoryFile
+   */
+  events: TaskHistoryEvent[];
+};
+
+export function decodeHistoryFile(rawInput: unknown): HistoryFile | null {
+  if (isJSON(rawInput)) {
+    const decodedSchemaVersion = decodeNumber(rawInput['schemaVersion']);
+    const decodedEvents = decodeArray(rawInput['events'], decodeTaskHistoryEvent);
+
+    if (decodedSchemaVersion === null || decodedEvents === null) {
+      return null;
+    }
+
+    return {
+      schemaVersion: decodedSchemaVersion,
+      events: decodedEvents,
     };
   }
   return null;

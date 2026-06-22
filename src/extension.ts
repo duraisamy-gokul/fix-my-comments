@@ -31,25 +31,31 @@ export function activate(context: vscode.ExtensionContext): void {
     (reply?: vscode.CommentReply) => fmcController.submitComment(reply),
   );
 
-  const openTask = vscode.commands.registerCommand('fixMyComments.openTask', (task: Task) => {
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (folder == null) {
-      return;
-    }
-    const uri = vscode.Uri.joinPath(folder.uri, task.anchor.filePath);
-    const range = new vscode.Range(
-      task.anchor.startLine,
-      task.anchor.startCharacter,
-      task.anchor.endLine,
-      task.anchor.endCharacter,
-    );
-    return vscode.window.showTextDocument(uri, { selection: range });
-  });
+  const openTask = vscode.commands.registerCommand('fixMyComments.openTask', (task: Task) =>
+    fmcController.revealThread(task),
+  );
+
+  const resolveTask = vscode.commands.registerCommand(
+    'fixMyComments.resolveTask',
+    (target: unknown) => fmcController.setStatus(target, 'resolved'),
+  );
+
+  const reopenTask = vscode.commands.registerCommand(
+    'fixMyComments.reopenTask',
+    (target: unknown) => fmcController.setStatus(target, 'open'),
+  );
+
+  const blockTask = vscode.commands.registerCommand('fixMyComments.blockTask', (target: unknown) =>
+    fmcController.setStatus(target, 'blocked'),
+  );
 
   context.subscriptions.push(
     createTask,
     submitComment,
     openTask,
+    resolveTask,
+    reopenTask,
+    blockTask,
     tasksView,
     tasksProvider,
     fmcController,
