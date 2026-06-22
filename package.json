@@ -75,6 +75,12 @@
     ],
     "keybindings": [
       {
+        "command": "fixMyComments.createTask",
+        "key": "ctrl+shift+/",
+        "mac": "cmd+shift+/",
+        "when": "editorHasSelection && editorTextFocus"
+      },
+      {
         "command": "fixMyComments.submitComment",
         "key": "enter",
         "when": "inCommentEditorInput"

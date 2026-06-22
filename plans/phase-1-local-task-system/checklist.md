@@ -10,9 +10,9 @@ One subtask = one pull request. Claim a subtask before starting so two people do
 - [x] **Create-task command + inline comment widget** — VS Code Comments API inline thread widget appears on selection; Enter submits, Shift+Enter adds a line. Auto-generates title from filename and code snippet. Comment text saved as task description.
 - [x] **Persist task** — Task record saved atomically to storage; sidebar refreshes after save.
 - [x] **Sidebar tree view** — Activity bar view listing tasks with title and `filename:line`; live-refreshes when a task is created.
-- [ ] **Floating action button** — Show a CodeLens or cursor-adjacent button that opens the comment widget when a selection is active; hide when selection clears.
-- [ ] **Keyboard shortcut** — Global keybinding (e.g. `Cmd+Shift+/`) to open the comment widget on the current selection without right-clicking.
-- [ ] **Gutter decoration** — Render a coloured gutter marker beside each line range that has an open task.
+- [x] **Floating action button** — CodeLens `$(comment) Add Comment` appears above the selection while text is selected; disappears when selection clears.
+- [x] **Keyboard shortcut** — `Cmd+Shift+/` (Mac) / `Ctrl+Shift+/` (Win/Linux) opens the comment widget on the active selection.
+- [x] **Gutter decoration** — Blue comment-bubble gutter marker rendered on every line range that has an open task; refreshes on task save and editor switch.
 
 ## Verification
 

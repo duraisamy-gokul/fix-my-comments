@@ -40,5 +40,11 @@ export class TaskTreeItem extends vscode.TreeItem {
     const line = task.anchor.startLine + 1;
     this.description = `${fileName}:${line}`;
     this.tooltip = task.description.length > 0 ? task.description : task.title;
+    this.iconPath = new vscode.ThemeIcon('comment');
+    this.command = {
+      command: 'fixMyComments.openTask',
+      title: 'Go to task',
+      arguments: [task],
+    };
   }
 }
