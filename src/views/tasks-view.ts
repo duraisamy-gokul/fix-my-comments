@@ -35,16 +35,24 @@ export class TasksViewProvider implements vscode.TreeDataProvider<TaskTreeItem> 
 export class TaskTreeItem extends vscode.TreeItem {
   constructor(readonly task: Task) {
     super(task.title, vscode.TreeItemCollapsibleState.None);
+
     const filePath = task.anchor.filePath;
     const fileName = filePath.split('/').pop() ?? filePath;
     const line = task.anchor.startLine + 1;
-    this.description = `${fileName}:${line}`;
+    const isOrphaned = task.status === 'orphaned';
+
+    this.description = isOrphaned ? `${fileName}:${line} (orphaned)` : `${fileName}:${line}`;
     this.tooltip = task.description.length > 0 ? task.description : task.title;
-    this.iconPath = new vscode.ThemeIcon('comment');
-    this.command = {
-      command: 'fixMyComments.openTask',
-      title: 'Go to task',
-      arguments: [task],
-    };
+    this.iconPath = isOrphaned
+      ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'))
+      : new vscode.ThemeIcon('comment');
+
+    if (!isOrphaned) {
+      this.command = {
+        command: 'fixMyComments.openTask',
+        title: 'Go to task',
+        arguments: [task],
+      };
+    }
   }
 }

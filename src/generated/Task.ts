@@ -103,7 +103,7 @@ export function _decodeAuthorType(rawInput: unknown): AuthorType | undefined {
 
 /**
  * @type { CodeAnchor }
- * @description Location a task is anchored to (minimal in Phase 1)
+ * @description Location a task is anchored to
  */
 export type CodeAnchor = {
   /**
@@ -142,6 +142,24 @@ export type CodeAnchor = {
    * @memberof CodeAnchor
    */
   selectedText: string;
+  /**
+   * @description SHA-256 hex digest (first 16 chars) of selectedText
+   * @type { string }
+   * @memberof CodeAnchor
+   */
+  textHash: string | null;
+  /**
+   * @description Up to 3 lines immediately before the selection in document order
+   * @type { string[] }
+   * @memberof CodeAnchor
+   */
+  beforeContext: string[] | null;
+  /**
+   * @description Up to 3 lines immediately after the selection in document order
+   * @type { string[] }
+   * @memberof CodeAnchor
+   */
+  afterContext: string[] | null;
 };
 
 export function decodeCodeAnchor(rawInput: unknown): CodeAnchor | null {
@@ -152,6 +170,9 @@ export function decodeCodeAnchor(rawInput: unknown): CodeAnchor | null {
     const decodedStartCharacter = decodeNumber(rawInput['startCharacter']);
     const decodedEndCharacter = decodeNumber(rawInput['endCharacter']);
     const decodedSelectedText = decodeString(rawInput['selectedText']);
+    const decodedTextHash = decodeString(rawInput['textHash']);
+    const decodedBeforeContext = decodeArray(rawInput['beforeContext'], decodeString);
+    const decodedAfterContext = decodeArray(rawInput['afterContext'], decodeString);
 
     if (
       decodedFilePath === null ||
@@ -171,6 +192,9 @@ export function decodeCodeAnchor(rawInput: unknown): CodeAnchor | null {
       startCharacter: decodedStartCharacter,
       endCharacter: decodedEndCharacter,
       selectedText: decodedSelectedText,
+      textHash: decodedTextHash,
+      beforeContext: decodedBeforeContext,
+      afterContext: decodedAfterContext,
     };
   }
   return null;
