@@ -1,7 +1,26 @@
 import * as vscode from 'vscode';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { WorkspaceIdentity } from '../generated';
 
+/**
+ * Fix My Comments stores all task data under `~/.fixmycomments/` (the home
+ * directory root, like `~/.claude/`), never inside the user's source repo.
+ *
+ * Layout (human-readable repo + branch, shared verbatim by the MCP server):
+ *
+ *   ~/.fixmycomments/
+ *     <repo-basename>-<shorthash>/   ← repo + short hash for uniqueness
+ *       <branch>/                     ← branch slashes become dashes
+ *         tasks.json
+ *         messages.json
+ *         history.json
+ *         executions.json
+ *
+ * Both this extension and the `fix-my-comments-mcp` server compute this path,
+ * so the rule below is the contract between them and must not drift.
+ */
 export async function resolveWorkspaceIdentity(): Promise<WorkspaceIdentity | null> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder == null) {
@@ -10,9 +29,30 @@ export async function resolveWorkspaceIdentity(): Promise<WorkspaceIdentity | nu
 
   const repoRoot = folder.uri.fsPath;
   const branch = await readBranch(folder.uri);
-  const key = createHash('sha1').update(`${repoRoot}@${branch}`).digest('hex').slice(0, 16);
+  const storagePath = computeStoragePath(repoRoot, branch);
 
-  return { repoRoot, branch, key };
+  return {
+    repoRoot,
+    branch,
+    storagePath,
+  };
+}
+
+/** Home-relative root for all Fix My Comments data. */
+export const STORAGE_ROOT = path.join(os.homedir(), '.fixmycomments');
+
+/**
+ * Compute the on-disk directory for a repo+branch. Shared with the MCP server.
+ * Branch slashes become dashes so feature/branch lives at feature-branch.
+ */
+export function computeStoragePath(repoRoot: string, branch: string): string {
+  const repoFolder = `${path.basename(repoRoot)}-${hashRepoRoot(repoRoot)}`;
+  const branchFolder = branch.replace(/\//g, '-');
+  return path.join(STORAGE_ROOT, repoFolder, branchFolder);
+}
+
+function hashRepoRoot(repoRoot: string): string {
+  return createHash('sha1').update(repoRoot).digest('hex').slice(0, 8);
 }
 
 async function readBranch(root: vscode.Uri): Promise<string> {

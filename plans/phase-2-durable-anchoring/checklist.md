@@ -16,4 +16,4 @@ One subtask = one pull request.
 ## Verification
 
 - [x] `npm run check` passes.
-- [ ] Manual: edit, reformat, move, and delete anchored code; confirm correct recovery and orphaning.
+- [x] Manual: edit, reformat, move, and delete anchored code; confirm correct recovery and orphaning.

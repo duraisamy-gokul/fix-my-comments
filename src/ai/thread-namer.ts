@@ -1,9 +1,13 @@
 const MAX_NAME_LENGTH = 60;
 const MAX_WORDS = 8;
 
-export function generateThreadName(selectedText: string, firstMessage: string): string {
-  const source = firstMessage.trim().length > 0 ? firstMessage : selectedText;
-  const firstLine = source
+/**
+ * Generate a short thread name from the first user message. Comments are now
+ * attached to a single line (no selected code), so the name comes from the
+ * comment text alone.
+ */
+export function generateThreadName(firstMessage: string): string {
+  const firstLine = firstMessage
     .split('\n')
     .map((line) => line.trim())
     .find((line) => line.length > 0);

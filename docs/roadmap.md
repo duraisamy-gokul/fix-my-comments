@@ -50,25 +50,25 @@ Plan: complete (this repository).
 
 ### Phase 1 — Minimal Local Task System
 
-Create tasks from selected code, persist them in local extension storage scoped to repo + branch, and show them in the sidebar with basic gutter decorations.
+Create tasks from selected code, persist them under `~/.fixmycomments/<repo>-<hash>/<branch>/` (home directory root, scoped by repo + branch), and show them in the sidebar with basic gutter decorations.
 
 Plan: [`plans/phase-1-local-task-system`](../plans/phase-1-local-task-system/00-overview.md)
 
 ### Phase 2 — Durable Anchoring MVP
 
-Anchor tasks to code using text hash and context so they survive edits, formatting, and line moves. Detect orphaned tasks and resolve selection overlap.
+Anchor tasks to code using text hash and context so they survive edits, formatting, and line moves. Detect orphaned tasks and relocate anchors after recovery.
 
 Plan: [`plans/phase-2-durable-anchoring`](../plans/phase-2-durable-anchoring/00-overview.md)
 
-### Phase 3 — Thread View
+### Phase 3 — Bitbucket-style Thread View
 
-A thread panel where the user reads and replies to a task, changes status, and navigates back to the anchored code. AI auto-names threads.
+A custom webview thread panel where the user reads and replies to a task, posts and **applies suggestions** (Bitbucket-style diffs), changes status, and navigates back to the anchored code. AI auto-names threads. This replaces the earlier native Comments-panel approach for full review fidelity.
 
 Plan: [`plans/phase-3-thread-view`](../plans/phase-3-thread-view/00-overview.md)
 
-### Phase 4 — AI Agent Contract
+### Phase 4 — AI Agent Contract (MCP)
 
-A provider-agnostic contract so any AI agent can discover open tasks, post replies, record execution metadata, and update status.
+A provider-agnostic contract (the `fix-my-comments-mcp` package) so any AI agent can discover open tasks, post replies and suggestions, record execution metadata, and update status. Includes a "Connect AI Agent" flow that gives the user both the terminal install command and a `.mcp.json` snippet.
 
 Plan: [`plans/phase-4-ai-agent-contract`](../plans/phase-4-ai-agent-contract/00-overview.md)
 
@@ -80,7 +80,7 @@ Plan: [`plans/phase-5-ai-change-preview`](../plans/phase-5-ai-change-preview/00-
 
 ### Phase 6 — Git-Aware Recovery
 
-Use Git to detect file renames, handle branches and merges, and merge duplicated task histories across branches.
+Refresh comments on branch switch (watch `.git/HEAD`), detect file renames via Git, and use Git history as an extra anchor-recovery signal. Comments are strictly per-branch (no cross-branch history merging).
 
 Plan: [`plans/phase-6-git-aware-recovery`](../plans/phase-6-git-aware-recovery/00-overview.md)
 
@@ -92,15 +92,15 @@ Plan: [`plans/phase-7-scale-marketplace`](../plans/phase-7-scale-marketplace/00-
 
 ## Progress Tracker
 
-| Phase | Sub-product         | Done | Subtasks done |
-| ----- | ------------------- | ---- | ------------- |
-| 0     | Repository Init     | 1    | —             |
-| 1     | Local Task System   | 1    | 9 / 9         |
-| 2     | Durable Anchoring   | 1    | 7 / 8 (1 cut) |
-| 3     | Thread View         | 1    | 6 / 6         |
-| 4     | AI Agent Contract   | 0    | 0 / 5         |
-| 5     | AI Change Preview   | 0    | 0 / 4         |
-| 6     | Git-Aware Recovery  | 0    | 0 / 4         |
-| 7     | Scale & Marketplace | 0    | 0 / 6         |
+| Phase | Sub-product                 | Done | Subtasks done      |
+| ----- | --------------------------- | ---- | ------------------ |
+| 0     | Repository Init             | 1    | —                  |
+| 1     | Local Task System           | 1    | 9 / 9              |
+| 2     | Durable Anchoring           | 1    | 7 / 8 (1 cut)      |
+| 3     | Bitbucket-style Thread View | 0    | 1 / 7 (rebuilding) |
+| 4     | AI Agent Contract (MCP)     | 0    | 4 / 6 (reworking)  |
+| 5     | AI Change Preview           | 0    | 0 / 4              |
+| 6     | Git-Aware Recovery          | 0    | 0 / 4              |
+| 7     | Scale & Marketplace         | 0    | 0 / 6              |
 
 When you finish a subtask, update its checkbox in the phase `checklist.md`, and update this table and the phase status above in the same or a follow-up PR.

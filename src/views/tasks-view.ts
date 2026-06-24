@@ -18,7 +18,7 @@ export class TasksViewProvider implements vscode.TreeDataProvider<TaskTreeItem> 
     if (identity == null) {
       return [];
     }
-    const store = new TaskStore(this.context.globalStorageUri, identity);
+    const store = new TaskStore(identity);
     const tasks = await store.listTasks();
     return tasks.map((task) => new TaskTreeItem(task));
   }
@@ -38,8 +38,8 @@ export class TaskTreeItem extends vscode.TreeItem {
 
     const filePath = task.anchor.filePath;
     const fileName = filePath.split('/').pop() ?? filePath;
-    const line = task.anchor.startLine + 1;
-    const isOrphaned = task.status === 'orphaned';
+    const line = task.anchor.line + 1;
+    const isOrphaned = task.status === 'orphaned' || task.status === 'outdated';
     const location = `${fileName}:${line}`;
 
     this.description = task.status === 'open' ? location : `${location} · ${task.status}`;
@@ -70,6 +70,8 @@ function iconForStatus(status: Task['status']): vscode.ThemeIcon {
     case 'requires_review':
       return new vscode.ThemeIcon('eye');
     case 'orphaned':
+      return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
+    case 'outdated':
       return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
     default:
       return new vscode.ThemeIcon('comment');

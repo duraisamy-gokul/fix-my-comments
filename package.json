@@ -20,6 +20,9 @@
     "code-review"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
       {
@@ -163,7 +166,7 @@
         "command": "fixMyComments.createTask",
         "key": "ctrl+shift+/",
         "mac": "cmd+shift+/",
-        "when": "editorHasSelection && editorTextFocus"
+        "when": "editorTextFocus"
       },
       {
         "command": "fixMyComments.submitComment",

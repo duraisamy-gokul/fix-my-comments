@@ -12,10 +12,7 @@ const EMPTY_MESSAGES: MessageFile = { schemaVersion: 1, messages: [] };
 const EMPTY_HISTORY: HistoryFile = { schemaVersion: 1, events: [] };
 
 export class ThreadStore {
-  constructor(
-    private readonly globalStorageUri: vscode.Uri,
-    private readonly identity: WorkspaceIdentity,
-  ) {}
+  constructor(private readonly identity: WorkspaceIdentity) {}
 
   async listMessages(taskId: string): Promise<TaskMessage[]> {
     const data = await this.readMessages();
@@ -50,7 +47,7 @@ export class ThreadStore {
   }
 
   private get directory(): vscode.Uri {
-    return vscode.Uri.joinPath(this.globalStorageUri, this.identity.key);
+    return vscode.Uri.file(this.identity.storagePath);
   }
 
   private get messagesUri(): vscode.Uri {

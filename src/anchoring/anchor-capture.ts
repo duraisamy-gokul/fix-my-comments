@@ -2,40 +2,18 @@ import * as vscode from 'vscode';
 import { createHash } from 'node:crypto';
 import type { CodeAnchor } from '../generated';
 
-const CONTEXT_LINES = 3;
-
-export function buildAnchor(document: vscode.TextDocument, range: vscode.Range): CodeAnchor {
-  const selectedText = document.getText(range);
-  const textHash = createHash('sha256').update(selectedText).digest('hex').slice(0, 16);
-  const beforeContext = collectLines(document, range.start.line - 1, -1, CONTEXT_LINES);
-  const afterContext = collectLines(document, range.end.line + 1, 1, CONTEXT_LINES);
+/**
+ * Build a single-line anchor: just the file path, the line number, and a hash
+ * of that line's text. No selected text, no character ranges, no context.
+ * The line hash lets us detect when the commented line's content changes
+ * (and mark the comment outdated); the line number is followed as lines shift.
+ */
+export function buildAnchor(document: vscode.TextDocument, line: number): CodeAnchor {
+  const lineText = document.lineAt(line).text;
+  const lineHash = createHash('sha256').update(lineText).digest('hex').slice(0, 16);
   return {
     filePath: vscode.workspace.asRelativePath(document.uri),
-    startLine: range.start.line,
-    endLine: range.end.line,
-    startCharacter: range.start.character,
-    endCharacter: range.end.character,
-    selectedText,
-    textHash,
-    beforeContext,
-    afterContext,
+    line,
+    lineHash,
   };
-}
-
-function collectLines(
-  document: vscode.TextDocument,
-  start: number,
-  step: number,
-  count: number,
-): string[] {
-  const lines: string[] = [];
-  let line = start;
-  while (lines.length < count && line >= 0 && line < document.lineCount) {
-    lines.push(document.lineAt(line).text);
-    line += step;
-  }
-  if (step < 0) {
-    lines.reverse();
-  }
-  return lines;
 }

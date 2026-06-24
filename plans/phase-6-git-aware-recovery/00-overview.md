@@ -2,35 +2,34 @@
 
 ## Goal
 
-Use Git to make anchoring and task data resilient across real version-control workflows: file renames, branch switches, merges, and duplicated tasks across branches.
+Use Git to make anchoring and task data resilient across real version-control workflows, and make the extension **react to branch switches**. Comments stay strictly per-branch: there is no cross-branch history merging.
 
 ## Scope
 
 In scope:
 
+- **Branch reactivity** — watch `.git/HEAD` (and the active branch) so switching branches via `git checkout` refreshes the sidebar, gutter decorations, and open threads to show the new branch's comments.
 - Detect file renames via Git and follow the anchor to the new path.
-- Sensible behavior on branch switches and merges.
-- Merge duplicated task histories when the same task appears on multiple branches.
 - Use Git history as an additional anchor-recovery signal.
 
 Out of scope:
 
+- Cross-branch history merging or parent-branch carry-over (strict per-branch; team sync is a future opt-in).
 - Remote/team sync (future, beyond this roadmap).
 
 ## Subtask Breakdown
 
 ```mermaid
 flowchart TD
-    A[Git rename detection] --> B[Branch / merge behavior]
-    B --> C[Merge duplicated histories]
+    A[Branch reactivity on checkout] --> B[Git rename detection]
+    B --> C[Follow anchor to renamed file]
     A --> D[Git-history-assisted recovery]
 ```
 
 ## Acceptance Criteria
 
-- Renaming a file in Git keeps its tasks attached.
-- Switching and merging branches does not lose or corrupt tasks.
-- Duplicated tasks across branches are detected and their histories merged.
+- Switching branches refreshes the sidebar and decorations to show only the new branch's comments.
+- Renaming a file in Git keeps its tasks attached (anchor `filePath` follows the rename).
 - Git history improves recovery for relocated code.
 - `npm run check` passes.
 

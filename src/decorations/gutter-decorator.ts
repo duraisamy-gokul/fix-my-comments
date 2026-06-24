@@ -51,16 +51,14 @@ export class GutterDecorator implements vscode.Disposable {
     if (!this.tracker.isTracked(filePath)) {
       return;
     }
-    const liveRanges = this.tracker.getAllLiveRanges(filePath);
-    editor.setDecorations(this.decorationType, [...liveRanges.values()]);
+    editor.setDecorations(this.decorationType, this.rangesFromTracker(filePath));
   }
 
   private async applyToEditor(editor: vscode.TextEditor): Promise<void> {
     const filePath = vscode.workspace.asRelativePath(editor.document.uri);
 
     if (this.tracker.isTracked(filePath)) {
-      const liveRanges = this.tracker.getAllLiveRanges(filePath);
-      editor.setDecorations(this.decorationType, [...liveRanges.values()]);
+      editor.setDecorations(this.decorationType, this.rangesFromTracker(filePath));
       return;
     }
 
@@ -70,15 +68,24 @@ export class GutterDecorator implements vscode.Disposable {
         editor.setDecorations(this.decorationType, []);
         return;
       }
-      const store = new TaskStore(this.context.globalStorageUri, identity);
+      const store = new TaskStore(identity);
       this.cachedTasks = await store.listTasks();
     }
 
     const ranges = this.cachedTasks
       .filter((t) => t.anchor.filePath === filePath && t.status === 'open')
-      .map((t) => new vscode.Range(t.anchor.startLine, 0, t.anchor.endLine, 0));
+      .map((t) => lineToRange(t.anchor.line));
 
     editor.setDecorations(this.decorationType, ranges);
+  }
+
+  private rangesFromTracker(filePath: string): vscode.Range[] {
+    const liveLines = this.tracker.getAllLiveLines(filePath);
+    const ranges: vscode.Range[] = [];
+    for (const line of liveLines.values()) {
+      ranges.push(lineToRange(line));
+    }
+    return ranges;
   }
 
   dispose(): void {
@@ -87,4 +94,8 @@ export class GutterDecorator implements vscode.Disposable {
       d.dispose();
     }
   }
+}
+
+function lineToRange(line: number): vscode.Range {
+  return new vscode.Range(line, 0, line, 0);
 }
