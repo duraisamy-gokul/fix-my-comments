@@ -2,13 +2,13 @@
 
 ## Goal
 
-Let a developer create a task from selected code, persist it locally (scoped to repository + Git branch), and see it in the sidebar with a basic gutter indicator. No anchoring recovery, no AI, no thread UI yet — just the end-to-end skeleton with durable local storage.
+Let a developer create a task from selected code, persist it under `~/.fixmycomments/<repo>-<hash>/<branch>/` (home directory root, scoped to repository + Git branch), and see it in the sidebar with a basic gutter indicator. No anchoring recovery, no AI, no thread UI yet — just the end-to-end skeleton with durable local storage.
 
 ## Scope
 
 In scope:
 
-- Local storage layer using VS Code extension storage, keyed by repository root + branch.
+- Local storage layer at the home directory root under `~/.fixmycomments/<repo>-<hash>/<branch>/`, keyed by repository root + Git branch. Data lives outside the source repo, so nothing is ever committed.
 - Domain type tooling: author the type YAML + `gen:types` and generate the core types (task record, thread message, history event). Shapes are designed in [03-type-definitions.md](03-type-definitions.md).
 - Create-task command from an editor selection.
 - Floating action button on selection that triggers the command.
@@ -51,7 +51,8 @@ Decision to record in the bundler subtask: use esbuild for the extension host, a
 ## Acceptance Criteria
 
 - Selecting code and triggering the command creates a task.
-- The task and its root message are written to local extension storage, separated by repository and branch.
+- The task and its root message are written to `~/.fixmycomments/<repo>-<hash>/<branch>/tasks.json` + `messages.json`, separated by repo + branch.
+- The data lives outside the source repo (nothing is committed).
 - Reopening VS Code on the same repo + branch shows the task again.
 - The sidebar lists the task under the correct status section.
 - A gutter marker appears on the anchored lines.

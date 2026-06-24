@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { TaskStore } from '../storage/task-store';
 import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import { recoverAnchor } from './anchor-recovery';
-import { AnchorTracker } from './anchor-tracker';
-import type { CodeAnchor, Task } from '../generated';
+import { checkAnchor } from '../anchoring/anchor-recovery';
+import { AnchorTracker } from '../anchoring/anchor-tracker';
+import type { Task } from '../generated';
 import type { TasksViewProvider } from '../views/tasks-view';
 
 export class AnchorEngine implements vscode.Disposable {
@@ -39,7 +39,7 @@ export class AnchorEngine implements vscode.Disposable {
     if (identity == null) {
       return;
     }
-    const store = new TaskStore(this.context.globalStorageUri, identity);
+    const store = new TaskStore(identity);
     const tasks = await store.listTasks();
     const filePath = vscode.workspace.asRelativePath(document.uri);
     const fileTasks = tasks.filter((t) => t.anchor.filePath === filePath && t.status !== 'closed');
@@ -50,21 +50,21 @@ export class AnchorEngine implements vscode.Disposable {
     const now = new Date().toISOString();
 
     for (const task of fileTasks) {
-      if (task.status === 'orphaned') {
-        continue;
-      }
-      const result = recoverAnchor(document, task.anchor);
-      if (result == null) {
-        updates.push({ ...task, status: 'orphaned', updatedAt: now });
+      const liveLine = this.tracker.getLiveLine(filePath, task.id);
+      const anchor = liveLine != null ? { ...task.anchor, line: liveLine } : task.anchor;
+      const result = checkAnchor(document, anchor);
+
+      if (result.state === 'valid') {
+        if (anchor.line !== task.anchor.line) {
+          updates.push({ ...task, anchor, updatedAt: now });
+        }
+      } else if (result.state === 'outdated') {
+        if (task.status !== 'outdated') {
+          updates.push({ ...task, anchor, status: 'outdated', updatedAt: now });
+        }
       } else {
-        this.tracker.setLiveRange(filePath, task.id, result.range);
-        if (anchorMoved(task.anchor, result.range)) {
-          const updated = {
-            ...task,
-            anchor: mergeAnchor(task.anchor, result.range),
-            updatedAt: now,
-          };
-          updates.push(updated);
+        if (task.status !== 'orphaned') {
+          updates.push({ ...task, anchor, status: 'orphaned', updatedAt: now });
         }
       }
     }
@@ -86,33 +86,43 @@ export class AnchorEngine implements vscode.Disposable {
       return;
     }
     const filePath = vscode.workspace.asRelativePath(document.uri);
-    const liveRanges = this.tracker.getAllLiveRanges(filePath);
-    if (liveRanges.size === 0) {
+    const liveLines = this.tracker.getAllLiveLines(filePath);
+    if (liveLines.size === 0) {
       return;
     }
 
-    const store = new TaskStore(this.context.globalStorageUri, identity);
+    const store = new TaskStore(identity);
     const tasks = await store.listTasks();
     const now = new Date().toISOString();
-    let changed = false;
+    const updates: Task[] = [];
 
     for (const task of tasks) {
-      if (task.anchor.filePath !== filePath || task.status === 'orphaned') {
+      if (task.anchor.filePath !== filePath || task.status === 'closed') {
         continue;
       }
-      const liveRange = liveRanges.get(task.id);
-      if (liveRange == null || !anchorMoved(task.anchor, liveRange)) {
+      const liveLine = liveLines.get(task.id);
+      if (liveLine == null || liveLine === task.anchor.line) {
         continue;
       }
-      await store.saveTask({
-        ...task,
-        anchor: mergeAnchor(task.anchor, liveRange),
-        updatedAt: now,
-      });
-      changed = true;
+      // The line shifted during the session; persist the new line number.
+      // Re-check content too, since the save may have changed the line's text.
+      const anchor = { ...task.anchor, line: liveLine };
+      const result = checkAnchor(document, anchor);
+      const status =
+        result.state === 'outdated'
+          ? 'outdated'
+          : result.state === 'orphaned'
+            ? 'orphaned'
+            : task.status === 'outdated' || task.status === 'orphaned'
+              ? 'open'
+              : task.status;
+      updates.push({ ...task, anchor, status, updatedAt: now });
     }
 
-    if (changed) {
+    if (updates.length > 0) {
+      for (const task of updates) {
+        await store.saveTask(task);
+      }
       this.tasksProvider.refresh();
     }
   }
@@ -122,23 +132,4 @@ export class AnchorEngine implements vscode.Disposable {
       d.dispose();
     }
   }
-}
-
-function anchorMoved(anchor: CodeAnchor, range: vscode.Range): boolean {
-  return (
-    anchor.startLine !== range.start.line ||
-    anchor.endLine !== range.end.line ||
-    anchor.startCharacter !== range.start.character ||
-    anchor.endCharacter !== range.end.character
-  );
-}
-
-function mergeAnchor(existing: CodeAnchor, range: vscode.Range): CodeAnchor {
-  return {
-    ...existing,
-    startLine: range.start.line,
-    endLine: range.end.line,
-    startCharacter: range.start.character,
-    endCharacter: range.end.character,
-  };
 }

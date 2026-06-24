@@ -2,7 +2,7 @@ Storage:
   WorkspaceIdentity:
     description: Workspace identity derived from repo root and Git branch
     type: object
-    required: [repoRoot, branch, key]
+    required: [repoRoot, branch, storagePath]
     properties:
       repoRoot:
         description: Absolute path to the repository root
@@ -10,8 +10,10 @@ Storage:
       branch:
         description: Current Git branch name
         type: string
-      key:
-        description: Short SHA1 of repoRoot@branch used as the storage key
+      storagePath:
+        description: >
+          Absolute path under ~/.fixmycomments where this repo+branch's data
+          lives. Shared verbatim with the fix-my-comments-mcp server.
         type: string
 
   TaskFile:
@@ -55,3 +57,17 @@ Storage:
         type: array
         items:
           $ref: './types/task.yaml#/Task/TaskHistoryEvent'
+
+  ExecutionFile:
+    description: Root shape of the executions.json storage file
+    type: object
+    required: [schemaVersion, executions]
+    properties:
+      schemaVersion:
+        description: Storage schema version
+        type: number
+      executions:
+        description: All agent execution records for this workspace and branch
+        type: array
+        items:
+          $ref: './types/task.yaml#/Task/AgentExecution'

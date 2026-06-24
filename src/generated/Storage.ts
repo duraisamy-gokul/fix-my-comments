@@ -5,6 +5,8 @@ import {
   decodeTaskMessage,
   type TaskHistoryEvent,
   decodeTaskHistoryEvent,
+  type AgentExecution,
+  decodeAgentExecution,
 } from './Task';
 import {
   isJSON,
@@ -34,27 +36,28 @@ export type WorkspaceIdentity = {
    */
   branch: string;
   /**
-   * @description Short SHA1 of repoRoot@branch used as the storage key
+   * @description Absolute path under ~/.fixmycomments where this repo+branch's data lives. Shared verbatim with the fix-my-comments-mcp server.
+
    * @type { string }
    * @memberof WorkspaceIdentity
-   */
-  key: string;
+  */
+  storagePath: string;
 };
 
 export function decodeWorkspaceIdentity(rawInput: unknown): WorkspaceIdentity | null {
   if (isJSON(rawInput)) {
     const decodedRepoRoot = decodeString(rawInput['repoRoot']);
     const decodedBranch = decodeString(rawInput['branch']);
-    const decodedKey = decodeString(rawInput['key']);
+    const decodedStoragePath = decodeString(rawInput['storagePath']);
 
-    if (decodedRepoRoot === null || decodedBranch === null || decodedKey === null) {
+    if (decodedRepoRoot === null || decodedBranch === null || decodedStoragePath === null) {
       return null;
     }
 
     return {
       repoRoot: decodedRepoRoot,
       branch: decodedBranch,
-      key: decodedKey,
+      storagePath: decodedStoragePath,
     };
   }
   return null;
@@ -163,6 +166,42 @@ export function decodeHistoryFile(rawInput: unknown): HistoryFile | null {
     return {
       schemaVersion: decodedSchemaVersion,
       events: decodedEvents,
+    };
+  }
+  return null;
+}
+
+/**
+ * @type { ExecutionFile }
+ * @description Root shape of the executions.json storage file
+ */
+export type ExecutionFile = {
+  /**
+   * @description Storage schema version
+   * @type { number }
+   * @memberof ExecutionFile
+   */
+  schemaVersion: number;
+  /**
+   * @description All agent execution records for this workspace and branch
+   * @type { AgentExecution[] }
+   * @memberof ExecutionFile
+   */
+  executions: AgentExecution[];
+};
+
+export function decodeExecutionFile(rawInput: unknown): ExecutionFile | null {
+  if (isJSON(rawInput)) {
+    const decodedSchemaVersion = decodeNumber(rawInput['schemaVersion']);
+    const decodedExecutions = decodeArray(rawInput['executions'], decodeAgentExecution);
+
+    if (decodedSchemaVersion === null || decodedExecutions === null) {
+      return null;
+    }
+
+    return {
+      schemaVersion: decodedSchemaVersion,
+      executions: decodedExecutions,
     };
   }
   return null;

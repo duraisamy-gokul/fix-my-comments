@@ -19,6 +19,7 @@ export type TaskStatus =
   | 'blocked'
   | 'requires_review'
   | 'orphaned'
+  | 'outdated'
   | 'closed';
 
 export function decodeTaskStatus(rawInput: unknown): TaskStatus | null {
@@ -29,6 +30,7 @@ export function decodeTaskStatus(rawInput: unknown): TaskStatus | null {
     case 'blocked':
     case 'requires_review':
     case 'orphaned':
+    case 'outdated':
     case 'closed':
       return rawInput;
   }
@@ -43,6 +45,7 @@ export function _decodeTaskStatus(rawInput: unknown): TaskStatus | undefined {
     case 'blocked':
     case 'requires_review':
     case 'orphaned':
+    case 'outdated':
     case 'closed':
       return rawInput;
   }
@@ -103,7 +106,7 @@ export function _decodeAuthorType(rawInput: unknown): AuthorType | undefined {
 
 /**
  * @type { CodeAnchor }
- * @description Location a task is anchored to
+ * @description Location a task is anchored to — a single line in a file
  */
 export type CodeAnchor = {
   /**
@@ -113,88 +116,33 @@ export type CodeAnchor = {
    */
   filePath: string;
   /**
-   * @description Zero-based start line
+   * @description Zero-based line number the comment is attached to (followed as lines shift)
    * @type { number }
    * @memberof CodeAnchor
    */
-  startLine: number;
+  line: number;
   /**
-   * @description Zero-based end line
-   * @type { number }
-   * @memberof CodeAnchor
-   */
-  endLine: number;
-  /**
-   * @description Zero-based start character
-   * @type { number }
-   * @memberof CodeAnchor
-   */
-  startCharacter: number;
-  /**
-   * @description Zero-based end character
-   * @type { number }
-   * @memberof CodeAnchor
-   */
-  endCharacter: number;
-  /**
-   * @description The text that was selected when the task was created
+   * @description SHA-256 hex digest (first 16 chars) of the commented line's text; mismatch marks the comment outdated
    * @type { string }
    * @memberof CodeAnchor
    */
-  selectedText: string;
-  /**
-   * @description SHA-256 hex digest (first 16 chars) of selectedText
-   * @type { string }
-   * @memberof CodeAnchor
-   */
-  textHash: string | null;
-  /**
-   * @description Up to 3 lines immediately before the selection in document order
-   * @type { string[] }
-   * @memberof CodeAnchor
-   */
-  beforeContext: string[] | null;
-  /**
-   * @description Up to 3 lines immediately after the selection in document order
-   * @type { string[] }
-   * @memberof CodeAnchor
-   */
-  afterContext: string[] | null;
+  lineHash: string;
 };
 
 export function decodeCodeAnchor(rawInput: unknown): CodeAnchor | null {
   if (isJSON(rawInput)) {
     const decodedFilePath = decodeString(rawInput['filePath']);
-    const decodedStartLine = decodeNumber(rawInput['startLine']);
-    const decodedEndLine = decodeNumber(rawInput['endLine']);
-    const decodedStartCharacter = decodeNumber(rawInput['startCharacter']);
-    const decodedEndCharacter = decodeNumber(rawInput['endCharacter']);
-    const decodedSelectedText = decodeString(rawInput['selectedText']);
-    const decodedTextHash = decodeString(rawInput['textHash']);
-    const decodedBeforeContext = decodeArray(rawInput['beforeContext'], decodeString);
-    const decodedAfterContext = decodeArray(rawInput['afterContext'], decodeString);
+    const decodedLine = decodeNumber(rawInput['line']);
+    const decodedLineHash = decodeString(rawInput['lineHash']);
 
-    if (
-      decodedFilePath === null ||
-      decodedStartLine === null ||
-      decodedEndLine === null ||
-      decodedStartCharacter === null ||
-      decodedEndCharacter === null ||
-      decodedSelectedText === null
-    ) {
+    if (decodedFilePath === null || decodedLine === null || decodedLineHash === null) {
       return null;
     }
 
     return {
       filePath: decodedFilePath,
-      startLine: decodedStartLine,
-      endLine: decodedEndLine,
-      startCharacter: decodedStartCharacter,
-      endCharacter: decodedEndCharacter,
-      selectedText: decodedSelectedText,
-      textHash: decodedTextHash,
-      beforeContext: decodedBeforeContext,
-      afterContext: decodedAfterContext,
+      line: decodedLine,
+      lineHash: decodedLineHash,
     };
   }
   return null;
@@ -247,6 +195,18 @@ export type TaskMessage = {
    */
   content: string;
   /**
+   * @description Kind of message — comment (default) or suggestion (diff-style code change); null treated as comment
+   * @type { MessageTypeEnum }
+   * @memberof TaskMessage
+   */
+  messageType: MessageTypeEnum;
+  /**
+   * @description Proposed replacement code when messageType is suggestion; null for plain comments
+   * @type { string }
+   * @memberof TaskMessage
+   */
+  suggestionCode: string;
+  /**
    * @description ISO timestamp
    * @type { string }
    * @memberof TaskMessage
@@ -263,6 +223,8 @@ export function decodeTaskMessage(rawInput: unknown): TaskMessage | null {
     const decodedAuthorType = decodeAuthorType(rawInput['authorType']);
     const decodedAuthor = decodeString(rawInput['author']);
     const decodedContent = decodeString(rawInput['content']);
+    const decodedMessageType = decodeMessageTypeEnum(rawInput['messageType']);
+    const decodedSuggestionCode = decodeString(rawInput['suggestionCode']);
     const decodedTimestamp = decodeString(rawInput['timestamp']);
 
     if (
@@ -272,6 +234,8 @@ export function decodeTaskMessage(rawInput: unknown): TaskMessage | null {
       decodedAuthorType === null ||
       decodedAuthor === null ||
       decodedContent === null ||
+      decodedMessageType === null ||
+      decodedSuggestionCode === null ||
       decodedTimestamp === null
     ) {
       return null;
@@ -285,10 +249,36 @@ export function decodeTaskMessage(rawInput: unknown): TaskMessage | null {
       authorType: decodedAuthorType,
       author: decodedAuthor,
       content: decodedContent,
+      messageType: decodedMessageType,
+      suggestionCode: decodedSuggestionCode,
       timestamp: decodedTimestamp,
     };
   }
   return null;
+}
+
+/**
+ * @type { MessageTypeEnum }
+ * @description Kind of message — comment (default) or suggestion (diff-style code change); null treated as comment
+ */
+export type MessageTypeEnum = 'comment' | 'suggestion';
+
+export function decodeMessageTypeEnum(rawInput: unknown): MessageTypeEnum | null {
+  switch (rawInput) {
+    case 'comment':
+    case 'suggestion':
+      return rawInput;
+  }
+  return null;
+}
+
+export function _decodeMessageTypeEnum(rawInput: unknown): MessageTypeEnum | undefined {
+  switch (rawInput) {
+    case 'comment':
+    case 'suggestion':
+      return rawInput;
+  }
+  return;
 }
 
 /**
@@ -361,6 +351,106 @@ export function decodeTaskHistoryEvent(rawInput: unknown): TaskHistoryEvent | nu
       type: decodedType,
       actor: decodedActor,
       timestamp: decodedTimestamp,
+    };
+  }
+  return null;
+}
+
+/**
+ * @type { AgentExecution }
+ * @description Metadata from an AI agent execution linked to a thread message
+ */
+export type AgentExecution = {
+  /**
+   * @description Unique execution identifier
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  id: string;
+  /**
+   * @description Message this execution is linked to
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  messageId: string;
+  /**
+   * @description Task this execution is linked to
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  taskId: string;
+  /**
+   * @description Machine identifier for the agent (e.g. claude-code)
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  agentId: string;
+  /**
+   * @description Human-readable agent name
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  agentName: string;
+  /**
+   * @description ISO timestamp of execution
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  timestamp: string;
+  /**
+   * @description One-sentence summary of what the agent did
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  summary: string;
+  /**
+   * @description Why the agent performed this action
+   * @type { string }
+   * @memberof AgentExecution
+   */
+  reason: string | null;
+  /**
+   * @description Workspace-relative paths of files the agent changed
+   * @type { string[] }
+   * @memberof AgentExecution
+   */
+  filesChanged: string[] | null;
+};
+
+export function decodeAgentExecution(rawInput: unknown): AgentExecution | null {
+  if (isJSON(rawInput)) {
+    const decodedId = decodeString(rawInput['id']);
+    const decodedMessageId = decodeString(rawInput['messageId']);
+    const decodedTaskId = decodeString(rawInput['taskId']);
+    const decodedAgentId = decodeString(rawInput['agentId']);
+    const decodedAgentName = decodeString(rawInput['agentName']);
+    const decodedTimestamp = decodeString(rawInput['timestamp']);
+    const decodedSummary = decodeString(rawInput['summary']);
+    const decodedReason = decodeString(rawInput['reason']);
+    const decodedFilesChanged = decodeArray(rawInput['filesChanged'], decodeString);
+
+    if (
+      decodedId === null ||
+      decodedMessageId === null ||
+      decodedTaskId === null ||
+      decodedAgentId === null ||
+      decodedAgentName === null ||
+      decodedTimestamp === null ||
+      decodedSummary === null
+    ) {
+      return null;
+    }
+
+    return {
+      id: decodedId,
+      messageId: decodedMessageId,
+      taskId: decodedTaskId,
+      agentId: decodedAgentId,
+      agentName: decodedAgentName,
+      timestamp: decodedTimestamp,
+      summary: decodedSummary,
+      reason: decodedReason,
+      filesChanged: decodedFilesChanged,
     };
   }
   return null;

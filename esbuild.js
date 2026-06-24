@@ -3,26 +3,30 @@ const esbuild = require('esbuild');
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
+const shared = {
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
+  target: 'node18',
+  sourcemap: !production,
+  sourcesContent: false,
+  minify: production,
+  logLevel: 'warning',
+};
+
 async function main() {
-  const ctx = await esbuild.context({
+  const extensionCtx = await esbuild.context({
+    ...shared,
     entryPoints: ['src/extension.ts'],
-    bundle: true,
-    format: 'cjs',
-    platform: 'node',
-    target: 'node18',
     outfile: 'dist/extension.js',
     external: ['vscode'],
-    sourcemap: !production,
-    sourcesContent: false,
-    minify: production,
-    logLevel: 'warning',
   });
 
   if (watch) {
-    await ctx.watch();
+    await extensionCtx.watch();
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await extensionCtx.rebuild();
+    await extensionCtx.dispose();
   }
 }
 

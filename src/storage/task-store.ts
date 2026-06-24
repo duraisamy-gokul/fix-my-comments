@@ -5,10 +5,7 @@ import type { Task, TaskFile, WorkspaceIdentity } from '../generated';
 const EMPTY_FILE: TaskFile = { schemaVersion: 1, tasks: [] };
 
 export class TaskStore {
-  constructor(
-    private readonly globalStorageUri: vscode.Uri,
-    private readonly identity: WorkspaceIdentity,
-  ) {}
+  constructor(private readonly identity: WorkspaceIdentity) {}
 
   async listTasks(): Promise<Task[]> {
     const data = await this.read();
@@ -27,7 +24,7 @@ export class TaskStore {
   }
 
   private get directory(): vscode.Uri {
-    return vscode.Uri.joinPath(this.globalStorageUri, this.identity.key);
+    return vscode.Uri.file(this.identity.storagePath);
   }
 
   private get tasksUri(): vscode.Uri {

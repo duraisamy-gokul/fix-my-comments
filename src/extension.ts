@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { FixMyCommentsController } from './comments/comment-controller';
-import { CommentCodeLensProvider } from './comments/comment-lens';
 import { AnchorEngine } from './anchoring/anchor-engine';
 import { AnchorTracker } from './anchoring/anchor-tracker';
 import { GutterDecorator } from './decorations/gutter-decorator';
 import { TasksViewProvider } from './views/tasks-view';
+import { resolveWorkspaceIdentity, STORAGE_ROOT } from './storage/workspace-identity';
 import type { Task } from './generated';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -16,9 +16,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const gutterDecorator = new GutterDecorator(context, tracker);
   const gutterSync = tasksProvider.onDidChangeTreeData(() => gutterDecorator.refresh());
-
-  const codeLensProvider = new CommentCodeLensProvider();
-  const codeLens = vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider);
 
   const fmcController = new FixMyCommentsController(context, tasksProvider);
 
@@ -49,6 +46,8 @@ export function activate(context: vscode.ExtensionContext): void {
     fmcController.setStatus(target, 'blocked'),
   );
 
+  const storageWatcher = setupStorageWatcher(tasksProvider);
+
   context.subscriptions.push(
     createTask,
     submitComment,
@@ -63,9 +62,31 @@ export function activate(context: vscode.ExtensionContext): void {
     engine,
     gutterDecorator,
     gutterSync,
-    codeLensProvider,
-    codeLens,
+    storageWatcher,
   );
+}
+
+function setupStorageWatcher(tasksProvider: TasksViewProvider): vscode.Disposable {
+  // Storage lives under ~/.fixmycomments (home root), not in the workspace, so
+  // the watcher must be anchored to the home storage root via an absolute path.
+  const pattern = new vscode.RelativePattern(
+    vscode.Uri.file(STORAGE_ROOT),
+    '**/{tasks,messages,executions}.json',
+  );
+  const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+  const refresh = () => {
+    void resolveWorkspaceIdentity().then((identity) => {
+      if (identity != null) {
+        tasksProvider.refresh();
+      }
+    });
+  };
+
+  watcher.onDidChange(refresh);
+  watcher.onDidCreate(refresh);
+
+  return watcher;
 }
 
 export function deactivate(): void {}

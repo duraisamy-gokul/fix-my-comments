@@ -17,10 +17,10 @@ The extension must be designed as a serious production-grade developer productiv
 Key expectations:
 
 - Tasks are attached to code selections.
-- Tasks survive line changes, formatting, refactors, file moves, branch changes, and merges where possible.
-- Tasks are stored locally for the developer by default, not committed into the project repository.
-- Tasks are scoped by repository and Git branch so different branches can have different comments.
-- Git support is used for branch awareness, file tracking, rename detection, diff context, and future synchronization.
+- Tasks survive line changes, formatting, refactors, file moves, and branch switches where possible.
+- Tasks are stored under `~/.fixmycomments/` (the home directory root, like `~/.claude/`), scoped by repository + Git branch — never inside the source repo, so nothing is ever committed.
+- Tasks are strictly per-branch: each branch sees only its own comments, with no carry-over from parent branches.
+- Git support is used for branch reactivity (refresh on checkout), file tracking, rename detection, and diff context.
 - AI agents can discover, understand, work on, and update tasks.
 - User and AI discussion history is preserved locally.
 - AI-generated changes can be reviewed through a clear diff-oriented experience.
@@ -39,7 +39,7 @@ Key expectations:
 8. An AI agent may modify code and post a completion summary.
 9. The user reviews the AI-generated changes.
 10. The task is resolved, reopened, blocked, or closed.
-11. Full task and history data remain in local extension storage, scoped to the current repository and branch.
+11. Full task and history data remain under `~/.fixmycomments/<repo>-<hash>/<branch>/`, scoped to the current repo and branch.
 
 ## Task States
 
@@ -55,51 +55,53 @@ Supported task states:
 
 ## Local Storage Model
 
-Task data should be stored locally by default. The extension should not create committed project files unless the user explicitly exports or enables a future sync feature.
+Task data lives in the **home directory root** under `~/.fixmycomments/` (like `~/.claude/`), never inside the user's source repo. This keeps review notes out of the repository entirely (nothing to gitignore, nothing to accidentally commit) and lets the separate `fix-my-comments-mcp` server read it directly without a bridge into private extension storage.
 
 This product is primarily for a developer's own workflow: personal code notes, AI task tracking, branch-specific TODOs, and local AI collaboration.
 
-Planned local storage identity:
+Storage identity:
 
 ```text
-workspace identity + repository root + Git branch
+repository root + Git branch
 ```
 
-Planned storage contents:
+Physical layout (one folder per repo, one subfolder per branch — human-readable, strict per-branch isolation):
 
 ```text
-tasks          (lightweight task records)
-threads        (append-only message logs, keyed by task id)
-history        (append-only event logs, keyed by task id)
-metadata
-attachments
-branch index
-anchor index
+~/.fixmycomments/
+  <repo-basename>-<shorthash>/      ← repo basename + short sha1(repoRoot)
+    <branch>/                       ← branch slashes become dashes
+      tasks.json        (lightweight task records)
+      messages.json      (append-only thread logs, keyed by task id)
+      history.json       (append-only event logs, keyed by task id)
+      executions.json    (AI execution metadata)
 ```
+
+The repo folder name pairs the repo's basename with a short hash of its absolute path so two different repos with the same name don't collide, and the folder is still human-browsable. The on-disk path rule is shared verbatim between the extension and the MCP server (see `src/storage/workspace-identity.ts` ↔ `fix-my-comments-mcp/src/server.ts`).
 
 The append-only logs are the reason task data is split rather than embedded: see the Data Model section. Each reply or event appends one record instead of rewriting a large task document.
 
-The physical storage location should use VS Code extension storage APIs, such as `ExtensionContext.globalStorageUri` or `ExtensionContext.storageUri`, instead of writing task data into the user's source repository.
-
 The storage model should support:
 
+- Separate comments for separate Git branches (strict isolation — no parent-branch inheritance).
 - Separate comments for separate repositories.
-- Separate comments for separate Git branches.
 - Local history for each task.
-- Local attachments and AI execution metadata.
-- Fast lookup by repository, branch, file, status, and anchor.
+- AI execution metadata.
+- Fast lookup by branch, file, status, and anchor.
+- Automatic refresh when the active branch changes (see Git Integration).
 
-Future optional features may support export, import, or team sync, but local-only storage is the default product behavior.
+Future optional features may support export, import, or team sync. Because data lives in `~`, none of it is ever committed unless a user explicitly exports it.
 
 ## Data Model
 
 A task must not embed its full thread and history as inline arrays. Those collections grow without bound and are append-heavy: every reply or status change would otherwise rewrite the entire task document, which is slow at scale and hostile to Git merges.
 
-The model is therefore split into three concerns:
+The model is therefore split into four concerns:
 
 1. **Task record** — lightweight, bounded metadata. Rewritten freely.
 2. **Thread log** — an append-only stream of messages keyed by task id.
 3. **History log** — an append-only stream of events keyed by task id.
+4. **Execution log** — append-only AI execution metadata keyed by task id.
 
 `labels` and `assignments` stay inline on the task. They are small, bounded, and part of the task's identity, so splitting them adds lookups for no benefit.
 
@@ -241,15 +243,17 @@ Default shortcut can be something like `Cmd+Shift+/` on Mac or `Ctrl+Shift+/` on
 
 ### 3. Selection Overlap Behavior
 
-This is the core interaction model. When the user selects code and clicks the floating button or presses the shortcut, the extension checks the selection against existing tasks and chooses the correct behavior.
+When the user selects code and triggers the action (floating button or shortcut), the extension checks the selection against existing tasks and chooses the correct behavior.
+
+> **Current implementation note:** the first cut uses a simpler model — selecting code always opens the compose panel to start a new thread, and follow-ups are replies inside that thread. The exact/partial/inside routing below is the intended target once overlap classification lands.
 
 #### Case 1: No existing task overlaps the selection
 
-Open a new task creation panel.
+Open a new task creation panel (the compose panel).
 
 #### Case 2: Selection exactly matches an existing task anchor
 
-Open the existing task thread history directly.
+Open the existing task thread directly.
 
 No prompt needed. The user is looking at the same code they commented on before.
 
@@ -405,9 +409,9 @@ If the thread already exists, the name is preserved. The AI should not rename ex
 
 Thread name is stored as part of the task and displayed in the sidebar, hover card, and thread header.
 
-### 10. Thread View
+### 10. Thread View (Custom Webview)
 
-The thread view should feel similar to GitHub review threads.
+The thread view is a custom webview that renders like a GitHub/Bitbucket review thread. It is **not** VS Code's native Comments panel — a custom view is required for apply-able suggestions, AI attribution, and review actions that the native API cannot express.
 
 Each thread header should show:
 
@@ -416,6 +420,7 @@ Each thread header should show:
 - A **Go to Code** button that opens the file and scrolls to the anchored selection
 - Status badge
 - Created date
+- Status controls: Resolve / Reopen / Block
 
 Each thread should support messages from:
 
@@ -428,11 +433,28 @@ Each thread should support messages from:
 - Windsurf
 - Custom agents
 
-Messages use the thread-log record shape defined in the Data Model section (`id`, `taskId`, `parentId`, `seq`, `authorType`, `author`, `content`, `timestamp`, `attachments`, `changes`). The thread view renders them in `seq` order and uses `parentId` to indent threaded replies.
+Messages use the thread-log record shape defined in the Data Model section (`id`, `taskId`, `parentId`, `seq`, `authorType`, `author`, `content`, `messageType`, `suggestionCode`, `timestamp`). The thread view renders them in `seq` order and uses `parentId` to indent threaded replies. Each message shows its author with AI agents visually distinguished (badge + color) from human users.
 
-### 5. AI Change Preview
+### 11. Suggestions (Bitbucket-style)
 
-When an AI agent completes work, the extension should show:
+A message may be a **suggestion** — a proposed diff for the anchored code, in addition to plain comments. This is the defining Bitbucket/GitHub review feature.
+
+A suggestion message carries:
+
+- `messageType: "suggestion"`
+- `suggestionCode`: the proposed replacement for the anchored range
+- `content`: an optional explanation
+
+The thread view renders a suggestion as a split diff (original → suggested) with two actions:
+
+- **Apply suggestion** — replaces the anchored range in the file with `suggestionCode`, records an `applied` state on the message and a history event, and re-anchors the task if the line count changed.
+- **Reject suggestion** — marks the suggestion as rejected and appends a history event; no code changes.
+
+Suggestions can come from a human (the compose panel's Suggestion tab) or from an AI agent via the MCP contract. An applied suggestion is visually marked so the thread reads as a review timeline.
+
+### 12. AI Change Preview
+
+When an AI agent modifies code for a task (beyond a single suggestion), the extension should show:
 
 - Files modified
 - Diff preview
@@ -471,6 +493,7 @@ AI agents should be able to:
 6. Generate an explanation.
 7. Attach modified file/range metadata.
 8. Update the task thread and task status.
+9. Post a **suggestion** (a proposed replacement for the anchored range) that the user can apply or reject in the thread view.
 
 AI response shape:
 
@@ -484,6 +507,8 @@ AI response shape:
   "notes": []
 }
 ```
+
+When an agent proposes a single change for the anchored range, it posts a suggestion message (`messageType: "suggestion"`, `suggestionCode`) rather than editing files directly. Multi-file edits use the change-tracking shape below.
 
 ## AI Change Tracking
 
@@ -501,18 +526,16 @@ This enables later review, auditing, and blame-style inspection.
 
 ## Git Integration
 
-The extension should eventually understand:
+Comments are **strictly per-branch**. Each branch sees only its own `~/.fixmycomments/<repo>-<hash>/<branch>/` data; there is no carry-over from parent branches and no cross-branch history merging (that keeps the model simple and predictable; team sync is a later opt-in).
 
-- File renames
-- Branch changes
-- Merge operations
-- Rebase effects
-- Blame data
-- Commit metadata
-- Task duplication across branches
-- History merging
+The extension should understand:
 
-This is important because repository-backed task data will move through normal Git workflows.
+- **Branch reactivity** — refresh the sidebar, decorations, and open threads automatically when the active branch changes (on `git checkout`), by watching `.git/HEAD` and the active branch.
+- File renames (Git rename detection) — follow an anchor to a renamed file.
+- Blame data and commit metadata — as extra anchor-recovery signals.
+- Rebase effects on anchored ranges.
+
+This is important because repository-backed task data moves through normal Git workflows.
 
 ## Performance Requirements
 
@@ -564,7 +587,7 @@ Goals:
 
 Goals:
 
-- Create `.fix-my-comments/` repository storage.
+- Create `~/.fixmycomments/<repo>-<hash>/<branch>/` storage in the home directory root.
 - Define versioned task schema.
 - Create task from selected code.
 - Save task to `tasks.json`.
@@ -581,24 +604,28 @@ Goals:
 - Mark task as orphaned when recovery fails.
 - Update anchor after successful relocation.
 
-### Phase 3: Thread View
+### Phase 3: Bitbucket-style Thread View
 
 Goals:
 
-- Open task thread from sidebar or gutter marker.
-- Add user replies.
-- Preserve thread history.
-- Add task status changes from the UI.
+- Custom webview thread panel (not the native Comments panel).
+- Render messages in order with threaded replies and AI/human attribution.
+- Compose panel with Comment and Suggestion tabs.
+- Apply / reject suggestions inline.
+- Status controls (resolve, reopen, block).
+- Go-to-code navigation from panel and sidebar.
+- AI thread-naming hook for new threads.
 
-### Phase 4: AI Agent Contract
+### Phase 4: AI Agent Contract (MCP)
 
 Goals:
 
 - Define provider-agnostic task discovery format.
-- Allow AI agents to read open tasks.
-- Allow AI agents to post replies.
+- Allow AI agents to read open tasks and threads.
+- Allow AI agents to post replies and **suggestions**.
 - Allow AI agents to mark tasks as resolved or requiring review.
 - Store AI execution metadata.
+- "Connect AI Agent" onboarding that gives the user both the terminal install command and the `.mcp.json` snippet.
 
 ### Phase 5: AI Change Preview
 
@@ -613,9 +640,8 @@ Goals:
 
 Goals:
 
-- Detect file renames.
-- Improve branch and merge behavior.
-- Merge duplicated task histories.
+- Refresh sidebar/decorations on branch switch (`.git/HEAD` reactivity).
+- Detect file renames via Git and follow anchors.
 - Use Git history to improve anchor recovery.
 
 ### Phase 7: Scale and Marketplace Readiness
@@ -634,13 +660,14 @@ Goals:
 The first usable MVP should support:
 
 - Creating a task from selected code.
-- Persisting the task inside `.fix-my-comments/tasks.json`.
+- Persisting the task inside `~/.fixmycomments/<repo>-<hash>/<branch>/tasks.json`.
 - Displaying task markers in the editor.
 - Listing tasks in the sidebar.
-- Opening a basic thread view.
-- Adding messages to a task.
+- Opening a custom webview thread view.
+- Adding comments and **suggestions** to a task, and applying suggestions.
 - Resolving and reopening a task.
 - Recovering anchors after simple line movement or formatting changes.
+- Refreshing comments on branch switch.
 
 ## Non-Goals for Initial MVP
 
@@ -650,8 +677,8 @@ These are important, but not part of the first implementation pass:
 - Full AST support for every language.
 - Real-time multi-user collaboration.
 - External integrations such as GitHub, Jira, Linear, or Slack.
-- Built-in AI provider execution.
-- Complex merge conflict resolution UI.
+- Built-in AI provider execution (the MCP contract is provider-neutral; the user runs their own agent).
+- Cross-branch history merging (comments are strictly per-branch).
 
 ## Engineering Principles
 
