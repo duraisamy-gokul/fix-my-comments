@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { TaskStore } from '../storage/task-store';
+import { ThreadStore } from '../storage/thread-store';
 import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
 import { checkAnchor } from '../anchoring/anchor-recovery';
 import { AnchorTracker } from '../anchoring/anchor-tracker';
-import type { Task } from '../generated';
+import type { ReviewThread } from '../generated';
 import type { TasksViewProvider } from '../views/tasks-view';
 
 export class AnchorEngine implements vscode.Disposable {
@@ -24,6 +24,9 @@ export class AnchorEngine implements vscode.Disposable {
       vscode.workspace.onDidCloseTextDocument((doc) => {
         this.tracker.clearFile(vscode.workspace.asRelativePath(doc.uri));
       }),
+      tracker.onLineContentChanged((change) => {
+        void this.onLineContentChanged(change);
+      }),
     );
 
     for (const doc of vscode.workspace.textDocuments) {
@@ -35,54 +38,91 @@ export class AnchorEngine implements vscode.Disposable {
     if (document.uri.scheme !== 'file') {
       return;
     }
-    const identity = await resolveWorkspaceIdentity();
-    if (identity == null) {
+    const store = await this.resolveStore();
+    if (store == null) {
       return;
     }
-    const store = new TaskStore(identity);
-    const tasks = await store.listTasks();
     const filePath = vscode.workspace.asRelativePath(document.uri);
-    const fileTasks = tasks.filter((t) => t.anchor.filePath === filePath && t.status !== 'closed');
+    const threads = await store.listThreads();
+    const fileThreads = threads.filter((t) => t.anchor.filePath === filePath);
 
-    this.tracker.loadTasksForFile(filePath, fileTasks);
+    this.tracker.loadThreadsForFile(filePath, fileThreads);
 
-    const updates: Task[] = [];
+    const updates: ReviewThread[] = [];
     const now = new Date().toISOString();
 
-    for (const task of fileTasks) {
-      const liveLine = this.tracker.getLiveLine(filePath, task.id);
-      const anchor = liveLine != null ? { ...task.anchor, line: liveLine } : task.anchor;
+    for (const thread of fileThreads) {
+      const liveLine = this.tracker.getLiveLine(filePath, thread.id);
+      const anchor = liveLine != null ? { ...thread.anchor, line: liveLine } : thread.anchor;
       const result = checkAnchor(document, anchor);
 
       if (result.state === 'valid') {
-        if (anchor.line !== task.anchor.line) {
-          updates.push({ ...task, anchor, updatedAt: now });
+        if (anchor.line !== thread.anchor.line) {
+          updates.push({ ...thread, anchor, metadata: { ...thread.metadata, updatedAt: now } });
         }
       } else if (result.state === 'outdated') {
-        if (task.status !== 'outdated') {
-          updates.push({ ...task, anchor, status: 'outdated', updatedAt: now });
+        if (!thread.status.outdated) {
+          updates.push({
+            ...thread,
+            anchor,
+            status: { ...thread.status, outdated: true },
+            metadata: { ...thread.metadata, updatedAt: now },
+          });
         }
-      } else {
-        if (task.status !== 'orphaned') {
-          updates.push({ ...task, anchor, status: 'orphaned', updatedAt: now });
+      } else if (result.state === 'orphaned') {
+        // Orphaned is represented as outdated with a stale line; there is no
+        // separate orphaned flag in the Bitbucket-style status. We mark
+        // outdated so the thread surfaces for the user to resolve or recreate.
+        if (!thread.status.outdated) {
+          updates.push({
+            ...thread,
+            status: { ...thread.status, outdated: true },
+            metadata: { ...thread.metadata, updatedAt: now },
+          });
         }
       }
     }
 
     if (updates.length > 0) {
-      for (const task of updates) {
-        await store.saveTask(task);
+      for (const thread of updates) {
+        await store.saveThread(thread);
       }
       this.tasksProvider.refresh();
     }
+  }
+
+  /** Live: the commented line's own content changed → mark the thread outdated. */
+  private async onLineContentChanged(change: {
+    filePath: string;
+    threadId: string;
+    line: number;
+  }): Promise<void> {
+    const store = await this.resolveStore();
+    if (store == null) {
+      return;
+    }
+    const thread = await store.getThread(change.threadId);
+    if (thread == null) {
+      return;
+    }
+    if (thread.status.outdated) {
+      return;
+    }
+    const now = new Date().toISOString();
+    await store.saveThread({
+      ...thread,
+      status: { ...thread.status, outdated: true },
+      metadata: { ...thread.metadata, updatedAt: now },
+    });
+    this.tasksProvider.refresh();
   }
 
   private async onDocumentSaved(document: vscode.TextDocument): Promise<void> {
     if (document.uri.scheme !== 'file') {
       return;
     }
-    const identity = await resolveWorkspaceIdentity();
-    if (identity == null) {
+    const store = await this.resolveStore();
+    if (store == null) {
       return;
     }
     const filePath = vscode.workspace.asRelativePath(document.uri);
@@ -91,40 +131,45 @@ export class AnchorEngine implements vscode.Disposable {
       return;
     }
 
-    const store = new TaskStore(identity);
-    const tasks = await store.listTasks();
+    const threads = await store.listThreads();
     const now = new Date().toISOString();
-    const updates: Task[] = [];
+    const updates: ReviewThread[] = [];
 
-    for (const task of tasks) {
-      if (task.anchor.filePath !== filePath || task.status === 'closed') {
+    for (const thread of threads) {
+      if (thread.anchor.filePath !== filePath || thread.anchor.type !== 'file') {
         continue;
       }
-      const liveLine = liveLines.get(task.id);
-      if (liveLine == null || liveLine === task.anchor.line) {
+      const liveLine = liveLines.get(thread.id);
+      if (liveLine == null || liveLine === thread.anchor.line) {
         continue;
       }
       // The line shifted during the session; persist the new line number.
       // Re-check content too, since the save may have changed the line's text.
-      const anchor = { ...task.anchor, line: liveLine };
+      const anchor = { ...thread.anchor, line: liveLine };
       const result = checkAnchor(document, anchor);
-      const status =
-        result.state === 'outdated'
-          ? 'outdated'
-          : result.state === 'orphaned'
-            ? 'orphaned'
-            : task.status === 'outdated' || task.status === 'orphaned'
-              ? 'open'
-              : task.status;
-      updates.push({ ...task, anchor, status, updatedAt: now });
+      const outdated = result.state === 'outdated' || result.state === 'orphaned';
+      updates.push({
+        ...thread,
+        anchor,
+        status: { ...thread.status, outdated },
+        metadata: { ...thread.metadata, updatedAt: now },
+      });
     }
 
     if (updates.length > 0) {
-      for (const task of updates) {
-        await store.saveTask(task);
+      for (const thread of updates) {
+        await store.saveThread(thread);
       }
       this.tasksProvider.refresh();
     }
+  }
+
+  private async resolveStore(): Promise<ThreadStore | null> {
+    const identity = await resolveWorkspaceIdentity();
+    if (identity == null) {
+      return null;
+    }
+    return new ThreadStore(identity);
   }
 
   dispose(): void {

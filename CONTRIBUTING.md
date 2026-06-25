@@ -159,7 +159,7 @@ Put this in a **"Testing"** section of the PR description.
    - Open the Run and Debug view (`Cmd+Shift+D` / `Ctrl+Shift+D`) and click the green ▶ **Run Extension**, or
    - press `F5` (on macOS, if `F5` triggers Dictation, use `fn`+`F5` or the green ▶ button instead).
    - This opens a second VS Code window with the extension loaded.
-3. In that window, exercise your change. As a baseline smoke test, open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **"Fix My Comments: Hello World"** — you should see the notification _"Fix My Comments is ready."_
+3. In that window, exercise your change. As a baseline smoke test, open a file, select some code, and run **"Fix My Comments: Comment"** from the Command Palette (`Cmd/Ctrl+Shift+P`) — or press `Cmd/Ctrl+Shift+/` — and you should see a comment thread open on the selection. The **Tasks** view in the activity bar should list the new task.
 4. Capture the result (screenshot / recording / output) for the PR.
 
 > There is no automated test suite yet — it arrives in Phase 7. Until then, manual proof in the PR is mandatory. When you add logic that can be unit-tested, prefer adding a test over a manual screenshot.

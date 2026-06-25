@@ -1,0 +1,39 @@
+# .vscodeignore — controls what goes into the published VSIX.
+# List only what should NOT be packaged. vsce always includes package.json,
+# README.md, and (if present) LICENSE/CHANGELOG automatically.
+#
+# The extension runtime needs only: dist/, package.json, README.md, LICENSE,
+# resources/, and node_modules/type-decoder/ (the one runtime dep that esbuild
+# does not bundle). Everything else here is dev-only.
+
+# --- Build / tooling output we don't ship ---
+out/
+**/*.map
+**/*.ts
+tsconfig.json
+esbuild.js
+eslint.config.mjs
+.prettierrc
+.prettierignore
+.gitignore
+.vscodeignore
+
+# --- Source (esbuild already bundled it into dist/extension.js) ---
+src/
+
+# --- Type specs (generate src/generated/, not needed at runtime) ---
+types/
+
+# --- Plan / design docs (not needed at runtime) ---
+plans/
+
+# --- Hook + editor config ---
+.husky/
+.vscode/
+*.code-workspace
+
+# --- Dev-only node_modules — keep ONLY type-decoder (runtime dep, not bundled).
+# Blacklist everything else so dev tooling and the globally-linked
+# fix-my-comments-mcp server don't get packaged.
+node_modules/**
+!node_modules/type-decoder/**

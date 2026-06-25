@@ -2,10 +2,16 @@
   "name": "fix-my-comments",
   "displayName": "Fix My Comments",
   "description": "AI-powered task management and collaboration layer attached directly to source code.",
-  "version": "0.0.1",
-  "publisher": "fix-my-comments",
+  "version": "0.0.3",
+  "publisher": "Gokul-duraisamy",
   "private": true,
   "license": "MIT",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/duraisamy-gokul/fix-my-comments.git"
+  },
+  "homepage": "https://github.com/duraisamy-gokul/fix-my-comments#readme",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -32,33 +38,73 @@
       },
       {
         "command": "fixMyComments.submitComment",
-        "title": "Add Comment",
+        "title": "💬 Add Comment",
         "category": "Fix My Comments",
         "enablement": "!commentIsEmpty"
       },
       {
-        "command": "fixMyComments.openTask",
-        "title": "Go to Code",
+        "command": "fixMyComments.openThread",
+        "title": "Go to Thread",
         "category": "Fix My Comments",
         "icon": "$(go-to-file)"
       },
       {
-        "command": "fixMyComments.resolveTask",
-        "title": "Resolve",
+        "command": "fixMyComments.toggleResolved",
+        "title": "Toggle Resolved",
         "category": "Fix My Comments",
         "icon": "$(pass)"
       },
       {
-        "command": "fixMyComments.reopenTask",
-        "title": "Reopen",
+        "command": "fixMyComments.react",
+        "title": "React",
         "category": "Fix My Comments",
-        "icon": "$(issue-reopened)"
+        "icon": "$(smiley)"
       },
       {
-        "command": "fixMyComments.blockTask",
-        "title": "Block",
+        "command": "fixMyComments.setCommentMode",
+        "title": "💬 Normal Comment",
         "category": "Fix My Comments",
-        "icon": "$(circle-slash)"
+        "icon": "$(comment)"
+      },
+      {
+        "command": "fixMyComments.addTaskMessage",
+        "title": "📝 Task",
+        "category": "Fix My Comments",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "fixMyComments.addSuggestionMessage",
+        "title": "💡 Suggestion",
+        "category": "Fix My Comments",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "fixMyComments.cycleDraftMode",
+        "title": "Switch Comment Type",
+        "category": "Fix My Comments",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "fixMyComments.toggleTaskMessage",
+        "title": "Toggle Task",
+        "category": "Fix My Comments",
+        "icon": "$(check)"
+      },
+      {
+        "command": "fixMyComments.chooseReaction",
+        "title": "Choose Reaction",
+        "category": "Fix My Comments"
+      },
+      {
+        "command": "fixMyComments.resetThread",
+        "title": "New Thread",
+        "category": "Fix My Comments",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "fixMyComments.cancelInlineHelper",
+        "title": "Cancel Inline Comment Helper",
+        "category": "Fix My Comments"
       }
     ],
     "menus": {
@@ -68,19 +114,47 @@
           "when": "false"
         },
         {
-          "command": "fixMyComments.openTask",
+          "command": "fixMyComments.openThread",
           "when": "false"
         },
         {
-          "command": "fixMyComments.resolveTask",
+          "command": "fixMyComments.toggleResolved",
           "when": "false"
         },
         {
-          "command": "fixMyComments.reopenTask",
+          "command": "fixMyComments.react",
           "when": "false"
         },
         {
-          "command": "fixMyComments.blockTask",
+          "command": "fixMyComments.setCommentMode",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.addTaskMessage",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.addSuggestionMessage",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.cycleDraftMode",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.toggleTaskMessage",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.chooseReaction",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.resetThread",
+          "when": "false"
+        },
+        {
+          "command": "fixMyComments.cancelInlineHelper",
           "when": "false"
         }
       ],
@@ -100,41 +174,48 @@
       ],
       "comments/commentThread/title": [
         {
-          "command": "fixMyComments.resolveTask",
+          "command": "fixMyComments.setCommentMode",
           "group": "inline@1",
-          "when": "commentController == fixMyComments"
+          "when": "commentThread =~ /thread:.+/"
         },
         {
-          "command": "fixMyComments.reopenTask",
+          "command": "fixMyComments.addTaskMessage",
           "group": "inline@2",
-          "when": "commentController == fixMyComments"
+          "when": "commentThread =~ /thread:.+/"
         },
         {
-          "command": "fixMyComments.blockTask",
+          "command": "fixMyComments.addSuggestionMessage",
           "group": "inline@3",
-          "when": "commentController == fixMyComments"
+          "when": "commentThread =~ /thread:.+/"
+        },
+        {
+          "command": "fixMyComments.cycleDraftMode",
+          "group": "inline@4",
+          "when": "commentThread =~ /thread:.+/"
+        },
+        {
+          "command": "fixMyComments.resetThread",
+          "group": "inline@5",
+          "when": "commentThread =~ /thread:.+/"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "fixMyComments.toggleTaskMessage",
+          "group": "inline@1",
+          "when": "comment =~ /task:.+/"
         }
       ],
       "view/item/context": [
         {
-          "command": "fixMyComments.openTask",
+          "command": "fixMyComments.openThread",
           "group": "inline@1",
-          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
+          "when": "view == fixMyComments.tasks && viewItem == fmcThread"
         },
         {
-          "command": "fixMyComments.resolveTask",
+          "command": "fixMyComments.toggleResolved",
           "group": "1_status@1",
-          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
-        },
-        {
-          "command": "fixMyComments.reopenTask",
-          "group": "1_status@2",
-          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
-        },
-        {
-          "command": "fixMyComments.blockTask",
-          "group": "1_status@3",
-          "when": "view == fixMyComments.tasks && viewItem == fmcTask"
+          "when": "view == fixMyComments.tasks && viewItem == fmcThread"
         }
       ]
     },
@@ -158,7 +239,7 @@
     "viewsWelcome": [
       {
         "view": "fixMyComments.tasks",
-        "contents": "No tasks yet.\nSelect code in the editor to create your first task."
+        "contents": "No comments yet.\nUse the Comment command (Cmd/Ctrl+Shift+/) on a line to start a thread."
       }
     ],
     "keybindings": [
@@ -176,6 +257,29 @@
       {
         "command": "lineBreakInsert",
         "key": "shift+enter",
+        "when": "inCommentEditorInput"
+      },
+      {
+        "command": "fixMyComments.cancelInlineHelper",
+        "key": "escape",
+        "when": "inCommentEditorInput"
+      },
+      {
+        "command": "fixMyComments.setCommentMode",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c",
+        "when": "inCommentEditorInput"
+      },
+      {
+        "command": "fixMyComments.addTaskMessage",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "inCommentEditorInput"
+      },
+      {
+        "command": "fixMyComments.addSuggestionMessage",
+        "key": "ctrl+alt+s",
+        "mac": "cmd+alt+s",
         "when": "inCommentEditorInput"
       }
     ]
