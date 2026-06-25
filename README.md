@@ -1,118 +1,120 @@
 # Fix My Comments
 
-**An AI-powered task and collaboration layer that lives directly on top of your code — inside VS Code.**
+**A local code-comment collaboration layer for VS Code and AI agents.**
 
-Select code. Attach a task. Discuss it with AI agents. Let them resolve it. Review the changes. Keep the full history — all without leaving the editor, and all stored locally per repository and branch.
+Add native VS Code comment threads on code lines, switch each draft between a normal comment, task, or code suggestion, let AI agents reply through MCP, and keep everything stored locally per repository and branch.
 
-> **Status: early development.** Phase 0 (project scaffold, tooling, CI hooks, planning) is complete. The features below describe the product being built across the [roadmap](docs/roadmap.md). This is the place to contribute from the ground up.
-
----
-
-## Why This Extension
-
-Code review tools live in the browser. TODOs rot inside comments. Notes-to-self live in scattered files that drift out of sync with the code they describe. And when an AI agent changes your code, the _reasoning_ behind the change is lost the moment the chat window closes.
-
-Fix My Comments fixes that by making the **task** a first-class object attached to a **piece of code**:
-
-- It rides along with the code as it moves, gets refactored, or is reformatted.
-- It holds a full conversation — you and any number of AI agents.
-- It records exactly what an AI changed, why, and lets you accept or reject it.
-- It lives locally, scoped to your repository and current Git branch, so your branches can carry different notes.
-
-Think **GitHub Issues + code review threads + AI agents**, collapsed into the editor and pinned to the exact lines they're about.
+> **Status: early development.** The extension and MCP server are evolving together; storage currently lives outside the repo under `~/.fixmycomments/`.
 
 ---
 
 ## What It Does
 
-You select a method:
+Put your cursor on a line and start a thread:
 
-```java
-public User getUser(Long id) {
-   ...
+```ts
+function calculateTotal(items: Item[]) {
+  return items.reduce((sum, item) => sum + item.price, 0);
 }
 ```
 
-A floating button appears. You create a task:
+Then choose the type of reply you want:
 
-> _"Refactor this method and reduce duplication."_
+- 💬 **Normal comment** — regular discussion.
+- 📝 **Task** — checkbox item that can be completed later.
+- 💡 **Suggestion** — replacement code for the current line.
 
-That task is now **anchored** to those lines. Later:
+Agents connected through the `fix-my-comments-mcp` server can discover open threads, read only the message context they need, reply, post suggestions, react with emoji, resolve/reopen threads, and check off task messages.
 
-- An AI agent discovers the open task, refactors the code, and posts a reply explaining what changed.
-- You review the diff inline and **accept**, **reject**, or **request changes**.
-- The task moves to `resolved` — and the whole thread is preserved.
-- If the code moves or gets reformatted, the task follows it. If the code is deleted, the task is marked `orphaned` rather than silently lost.
+If the anchored line changes, the thread is marked **outdated** so agents do not act on stale comments by accident.
+
+---
+
+## Quick Start
+
+Fix My Comments has two parts:
+
+1. **The VS Code extension** — the editor UI that creates and displays native comment threads.
+2. **The `fix-my-comments-mcp` server** — exposes those threads to AI agents (Claude Code, Cursor, etc.) over the [Model Context Protocol](https://modelcontextprotocol.io/).
+
+Both read and write the same data, stored under `~/.fixmycomments/<repo>-<hash>/<branch>/` — so nothing is committed into your project, and your branches can carry different notes.
+
+### 1. Install the extension
+
+The extension is in early development. To run it today, build from source (see the [Contributing guide](CONTRIBUTING.md)); a Marketplace release is planned.
+
+### 2. Install the MCP server globally
+
+```bash
+npm install -g fix-my-comments-mcp
+```
+
+This installs the `fix-my-comments` command on your PATH.
+
+### 3. Connect it to Claude Code
+
+Run this in your terminal — it registers the server once for all your projects:
+
+```bash
+claude mcp add fix-my-comments --scope user -- fix-my-comments
+```
+
+Verify it connected:
+
+```bash
+claude mcp list
+```
+
+You should see `fix-my-comments` listed as **✔ Connected**.
+
+> **Run the server from inside your repo.** The server derives its storage path from your current directory and Git branch, so launch Claude Code from the project root — not your home folder — so comments map to the correct repository and branch.
+
+<details>
+<summary>Using a different agent (Cursor, Windsurf, custom)?</summary>
+
+The server is a plain stdio MCP server whose command is `fix-my-comments`. Point your agent's MCP config at that command, run from inside your repo. See the [MCP server README](https://github.com/duraisamy-gokul/fix-my-comments-mcp#readme) for details.
+
+</details>
 
 ---
 
 ## Key Features
 
-| Feature                     | Description                                                                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Code-anchored tasks**     | Attach a task to a selection, a whole file, or the entire repository.                                                          |
-| **Durable anchoring**       | Tasks survive edits, formatting, and line moves via text-hash + context recovery — not fragile line numbers.                   |
-| **Floating action button**  | Select code and a button appears at the cursor; a configurable keyboard shortcut does the same.                                |
-| **Smart selection routing** | Re-selecting anchored code opens its history; partial overlap lets you choose new vs. existing; exact match jumps straight in. |
-| **AI-named threads**        | Every thread is automatically given a short, descriptive name by AI.                                                           |
-| **Conversation threads**    | GitHub-style threads with messages from you and any AI agent, preserved forever.                                               |
-| **AI change preview**       | See files and ranges an AI modified, review a diff, and accept / reject / request changes.                                     |
-| **Provider-agnostic AI**    | Works with Claude, Codex, ChatGPT, Gemini, Cursor, Windsurf, or custom agents — no provider is hardcoded.                      |
-| **Local & branch-scoped**   | Data is stored in local extension storage keyed by repo + branch — nothing is committed to your project.                       |
-| **Git-aware**               | Designed to follow file renames, branch switches, and merges.                                                                  |
-| **Built to scale**          | Targets 10,000+ tasks, large monorepos, and multi-root workspaces with incremental indexing.                                   |
+| Feature                           | Description                                                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Native VS Code comments**       | Uses `vscode.comments`, so threads feel like normal editor comments instead of a custom webview.                 |
+| **Single-line code anchors**      | Threads attach to a line, follow line shifts during editing, and become outdated if that line's content changes. |
+| **Comment / task / suggestion**   | Draft helpers let you post normal comments, checkbox tasks, or replacement-code suggestions.                     |
+| **Suggestion draft prefill**      | Suggestion mode highlights the current line and pre-fills it into the comment input for quick edits.             |
+| **Emoji reactions**               | Users and agents can react to messages with emoji.                                                               |
+| **Resolve and task checkboxes**   | Threads can be resolved/reopened, and task messages can be checked off.                                          |
+| **AI-agent MCP contract**         | Agents can list threads, fetch message windows, reply, suggest, react, and update status through MCP.            |
+| **Stale-comment protection**      | Outdated threads are filtered/blocked by default so agents avoid stale comments.                                 |
+| **Local & branch-scoped storage** | Data lives under `~/.fixmycomments/`, keyed by repo + branch — nothing is committed to your project.             |
+| **Tasks sidebar**                 | A VS Code activity-bar view lists current threads and jumps back to the source line.                             |
 
 ---
 
 ## How It Works
 
-### Selection → Task → Thread
-
 ```mermaid
 flowchart LR
-    S[Select code] --> B[Floating button / shortcut]
-    B --> C{Overlaps an existing task?}
-    C -- No --> N[New task]
-    C -- Exact / inside --> H[Open thread history]
-    C -- Partial --> P[Choose new or existing]
-    N --> T[Thread]
-    H --> T
-    T --> AI[AI discovers, replies, edits]
-    AI --> R[Review change → resolve]
+    L[Cursor on a line] --> C[Comment command / shortcut]
+    C --> T[Native VS Code thread]
+    T --> M{Draft type}
+    M --> N[Normal comment]
+    M --> K[Task checkbox]
+    M --> S[Code suggestion]
+    T --> A[MCP agent reads context]
+    A --> R[Reply / react / resolve]
+    T --> O[Outdated if line hash changes]
 ```
 
-### Durable Anchoring
+**Single-line anchoring.** Each thread stores a workspace-relative file path, zero-based line number, a short SHA-256 hash of that line's text, and the original snippet. Line numbers shift with edits during an editor session; if the line's content changes, the thread is marked outdated.
 
-Tasks never depend on line numbers alone. Each anchor stores the selected text, a content hash, and the surrounding lines, and recovers its location in stages:
-
-`exact hash → exact text → context match → (future) AST & semantic match → orphaned`
-
-### Local, Branch-Scoped Storage
-
-Task data is **not** committed into your repository. It lives in VS Code's extension storage, keyed by `repository root + Git branch`. The model separates a lightweight **task record** from append-only **thread** and **history** logs, so posting a reply appends one record instead of rewriting the task — fast at scale and friendly to your editor.
+**Branch-scoped storage.** Thread data lives under `~/.fixmycomments/<repo>-<hash>/<branch>/`, shared byte-for-byte with the MCP server. Threads and messages are stored separately, so agents can append replies without rewriting the whole thread list.
 
 See the full design in **[docs/product-plan.md](docs/product-plan.md)**.
-
----
-
-## Roadmap
-
-The product is built in ordered phases, each a self-contained sub-product. Contributors pick subtasks within a phase and ship them as individual PRs.
-
-`Done`: `1` = done, `0` = not done.
-
-| Phase | Sub-product                                                           | Done |
-| ----- | --------------------------------------------------------------------- | ---- |
-| 0     | Repository Initialization                                             | 1    |
-| 1     | [Local Task System](plans/phase-1-local-task-system/00-overview.md)   | 0    |
-| 2     | [Durable Anchoring](plans/phase-2-durable-anchoring/00-overview.md)   | 0    |
-| 3     | [Thread View](plans/phase-3-thread-view/00-overview.md)               | 0    |
-| 4     | [AI Agent Contract](plans/phase-4-ai-agent-contract/00-overview.md)   | 0    |
-| 5     | [AI Change Preview](plans/phase-5-ai-change-preview/00-overview.md)   | 0    |
-| 6     | [Git-Aware Recovery](plans/phase-6-git-aware-recovery/00-overview.md) | 0    |
-| 7     | [Scale & Marketplace](plans/phase-7-scale-marketplace/00-overview.md) | 0    |
-
-Full roadmap with diagrams and progress tracker: **[docs/roadmap.md](docs/roadmap.md)**.
 
 ---
 
@@ -121,21 +123,12 @@ Full roadmap with diagrams and progress tracker: **[docs/roadmap.md](docs/roadma
 - [Product design & data model](docs/product-plan.md)
 - [Roadmap](docs/roadmap.md)
 - [Sub-product plans](plans/README.md)
-- [Contributing guide](CONTRIBUTING.md)
 
 ---
 
 ## Contributing
 
-This project is built in the open, one small PR at a time. Work is organized as:
-
-```text
-Roadmap → Phase (sub-product) → Subtask → Pull Request → Mark done
-```
-
-Each subtask is a GitHub Issue. To avoid collisions, **claim before you code** — comment on the issue and open a draft PR with `Closes #X` so your claim is visible. Multiple contributors can work within the same phase by picking different subtasks.
-
-New here? Read the **[contributing guide](CONTRIBUTING.md)**, then [pick a subtask from the roadmap](docs/roadmap.md). It covers local setup, scripts, type generation, code style, and the claim flow.
+This project is built in the open, one small pull request at a time. If you want to contribute — local setup, scripts, project structure, code style, testing, and the claim flow are all in the **[Contributing guide](CONTRIBUTING.md)**.
 
 ---
 

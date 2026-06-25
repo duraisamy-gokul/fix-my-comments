@@ -5,7 +5,7 @@ import { AnchorTracker } from './anchoring/anchor-tracker';
 import { GutterDecorator } from './decorations/gutter-decorator';
 import { TasksViewProvider } from './views/tasks-view';
 import { resolveWorkspaceIdentity, STORAGE_ROOT } from './storage/workspace-identity';
-import type { Task } from './generated';
+import type { ReviewThread } from './generated';
 
 export function activate(context: vscode.ExtensionContext): void {
   const tasksProvider = new TasksViewProvider(context);
@@ -28,33 +28,76 @@ export function activate(context: vscode.ExtensionContext): void {
     (reply?: vscode.CommentReply) => fmcController.submitComment(reply),
   );
 
-  const openTask = vscode.commands.registerCommand('fixMyComments.openTask', (task: Task) =>
-    fmcController.revealThread(task),
+  const openThread = vscode.commands.registerCommand(
+    'fixMyComments.openThread',
+    (thread: ReviewThread) => fmcController.revealThread(thread),
   );
 
-  const resolveTask = vscode.commands.registerCommand(
-    'fixMyComments.resolveTask',
-    (target: unknown) => fmcController.setStatus(target, 'resolved'),
+  const toggleResolved = vscode.commands.registerCommand(
+    'fixMyComments.toggleResolved',
+    (target: unknown) => fmcController.toggleResolved(target),
   );
 
-  const reopenTask = vscode.commands.registerCommand(
-    'fixMyComments.reopenTask',
-    (target: unknown) => fmcController.setStatus(target, 'open'),
+  const react = vscode.commands.registerCommand('fixMyComments.react', (target: unknown) =>
+    fmcController.pickReaction(target),
   );
 
-  const blockTask = vscode.commands.registerCommand('fixMyComments.blockTask', (target: unknown) =>
-    fmcController.setStatus(target, 'blocked'),
+  const setCommentMode = vscode.commands.registerCommand(
+    'fixMyComments.setCommentMode',
+    (target?: unknown) => fmcController.setCommentMode(target),
   );
 
-  const storageWatcher = setupStorageWatcher(tasksProvider);
+  const addTaskMessage = vscode.commands.registerCommand(
+    'fixMyComments.addTaskMessage',
+    (target?: unknown) => fmcController.addTaskMessage(target),
+  );
+
+  const addSuggestionMessage = vscode.commands.registerCommand(
+    'fixMyComments.addSuggestionMessage',
+    (target?: unknown) => fmcController.addSuggestionMessage(target),
+  );
+
+  const cycleDraftMode = vscode.commands.registerCommand(
+    'fixMyComments.cycleDraftMode',
+    (target?: unknown) => fmcController.cycleDraftMode(target),
+  );
+
+  const toggleTaskMessage = vscode.commands.registerCommand(
+    'fixMyComments.toggleTaskMessage',
+    (target: unknown) => fmcController.toggleTaskMessage(target),
+  );
+
+  const chooseReaction = vscode.commands.registerCommand(
+    'fixMyComments.chooseReaction',
+    (messageId: string, emoji: string) => fmcController.chooseReaction(messageId, emoji),
+  );
+
+  const resetThread = vscode.commands.registerCommand(
+    'fixMyComments.resetThread',
+    (target: unknown) => fmcController.resetThread(target),
+  );
+
+  const cancelInlineHelper = vscode.commands.registerCommand(
+    'fixMyComments.cancelInlineHelper',
+    () => fmcController.cancelInlineHelper(),
+  );
+
+  const storageWatcher = setupStorageWatcher(fmcController, tasksProvider);
 
   context.subscriptions.push(
     createTask,
     submitComment,
-    openTask,
-    resolveTask,
-    reopenTask,
-    blockTask,
+    openThread,
+    toggleResolved,
+    react,
+    setCommentMode,
+    addTaskMessage,
+    addSuggestionMessage,
+    cycleDraftMode,
+    toggleTaskMessage,
+    chooseReaction,
+    resetThread,
+    cancelInlineHelper,
     tasksView,
     tasksProvider,
     fmcController,
@@ -66,20 +109,27 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 }
 
-function setupStorageWatcher(tasksProvider: TasksViewProvider): vscode.Disposable {
+function setupStorageWatcher(
+  fmcController: FixMyCommentsController,
+  tasksProvider: TasksViewProvider,
+): vscode.Disposable {
   // Storage lives under ~/.fixmycomments (home root), not in the workspace, so
   // the watcher must be anchored to the home storage root via an absolute path.
   const pattern = new vscode.RelativePattern(
     vscode.Uri.file(STORAGE_ROOT),
-    '**/{tasks,messages,executions}.json',
+    '**/{threads,messages}.json',
   );
   const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
   const refresh = () => {
     void resolveWorkspaceIdentity().then((identity) => {
-      if (identity != null) {
-        tasksProvider.refresh();
+      if (identity == null) {
+        return;
       }
+      // Rebuild native threads from disk — this is what makes AI-written replies
+      // (via the MCP server) and reloads surface live in the editor.
+      void fmcController.rebuildAllThreads();
+      tasksProvider.refresh();
     });
   };
 

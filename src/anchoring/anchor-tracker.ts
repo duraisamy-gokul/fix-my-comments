@@ -1,19 +1,26 @@
 import * as vscode from 'vscode';
-import type { Task } from '../generated';
+import { hashLine } from '../storage/git-info';
+import type { ReviewThread } from '../generated';
 
 /**
- * Tracks the live line number of each task's anchor while a file is open.
+ * Tracks the live line number of each thread's anchor while a file is open.
  *
  * The line number is a *cache*, never the identity — the identity is the line
  * hash. When edits happen above a commented line (insert/delete lines), we
  * shift the stored line so the comment follows its line through an editing
- * session. Changes to the commented line's own content are detected separately
- * by `checkAnchor` (hash mismatch → outdated) and are not a shift.
+ * session. When the commented line's *own* content changes, we surface it via
+ * the {@link onLineContentChanged} event so the engine can mark the thread
+ * outdated — that is a content change, not a shift.
  */
 export class AnchorTracker implements vscode.Disposable {
   private readonly liveLines = new Map<string, Map<string, number>>();
+  private readonly lineHashes = new Map<string, Map<string, string>>();
   private readonly trackedFiles = new Set<string>();
   private readonly disposable: vscode.Disposable;
+
+  private readonly onLineContentChangedEmitter = new vscode.EventEmitter<LineContentChange>();
+  /** Fired when a tracked line's own text changes (hash mismatch), not a shift. */
+  readonly onLineContentChanged = this.onLineContentChangedEmitter.event;
 
   constructor() {
     this.disposable = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -21,30 +28,44 @@ export class AnchorTracker implements vscode.Disposable {
     });
   }
 
-  loadTasksForFile(filePath: string, tasks: Task[]): void {
-    const map = new Map<string, number>();
-    for (const task of tasks) {
-      if (task.anchor.filePath !== filePath) {
+  loadThreadsForFile(filePath: string, threads: ReviewThread[]): void {
+    const lines = new Map<string, number>();
+    const hashes = new Map<string, string>();
+    for (const thread of threads) {
+      if (thread.anchor.filePath !== filePath || thread.anchor.type !== 'line') {
         continue;
       }
-      map.set(task.id, task.anchor.line);
+      if (thread.anchor.line != null) {
+        lines.set(thread.id, thread.anchor.line);
+      }
+      hashes.set(thread.id, thread.anchor.lineHash);
     }
-    this.liveLines.set(filePath, map);
+    this.liveLines.set(filePath, lines);
+    this.lineHashes.set(filePath, hashes);
     this.trackedFiles.add(filePath);
   }
 
-  setLiveLine(filePath: string, taskId: string, line: number): void {
+  setLiveLine(filePath: string, threadId: string, line: number): void {
     let map = this.liveLines.get(filePath);
     if (map == null) {
       map = new Map();
       this.liveLines.set(filePath, map);
     }
-    map.set(taskId, line);
+    map.set(threadId, line);
     this.trackedFiles.add(filePath);
   }
 
-  getLiveLine(filePath: string, taskId: string): number | null {
-    return this.liveLines.get(filePath)?.get(taskId) ?? null;
+  setLineHash(filePath: string, threadId: string, hash: string): void {
+    let map = this.lineHashes.get(filePath);
+    if (map == null) {
+      map = new Map();
+      this.lineHashes.set(filePath, map);
+    }
+    map.set(threadId, hash);
+  }
+
+  getLiveLine(filePath: string, threadId: string): number | null {
+    return this.liveLines.get(filePath)?.get(threadId) ?? null;
   }
 
   getAllLiveLines(filePath: string): Map<string, number> {
@@ -57,6 +78,7 @@ export class AnchorTracker implements vscode.Disposable {
 
   clearFile(filePath: string): void {
     this.liveLines.delete(filePath);
+    this.lineHashes.delete(filePath);
     this.trackedFiles.delete(filePath);
   }
 
@@ -69,15 +91,48 @@ export class AnchorTracker implements vscode.Disposable {
     if (lineMap == null) {
       return;
     }
-    for (const [taskId, line] of lineMap) {
-      lineMap.set(taskId, shiftLine(line, event.contentChanges));
+    const hashMap = this.lineHashes.get(filePath);
+
+    for (const [threadId, line] of lineMap) {
+      const before = line;
+      const after = shiftLine(line, event.contentChanges);
+      if (after !== before) {
+        lineMap.set(threadId, after);
+      }
+      // Detect a content change on the commented line itself: the line number
+      // didn't shift, but the text on it changed (hash mismatch → outdated).
+      if (after === before && hashMap != null) {
+        const storedHash = hashMap.get(threadId);
+        if (
+          storedHash != null &&
+          storedHash.length > 0 &&
+          after >= 0 &&
+          after < event.document.lineCount
+        ) {
+          const liveText = event.document.lineAt(after).text;
+          if (hashLine(liveText) !== storedHash) {
+            this.onLineContentChangedEmitter.fire({
+              filePath,
+              threadId,
+              line: after,
+            });
+          }
+        }
+      }
     }
   }
 
   dispose(): void {
     this.disposable.dispose();
+    this.onLineContentChangedEmitter.dispose();
   }
 }
+
+export type LineContentChange = {
+  filePath: string;
+  threadId: string;
+  line: number;
+};
 
 /**
  * Shift a single line number across a set of document content changes.
