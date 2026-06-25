@@ -1,26 +1,30 @@
 import * as vscode from 'vscode';
-import { TaskStore } from '../storage/task-store';
+import { ThreadStore } from '../storage/thread-store';
 import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import type { Task } from '../generated';
+import type { ReviewThread } from '../generated';
 
-export class TasksViewProvider implements vscode.TreeDataProvider<TaskTreeItem> {
-  private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<TaskTreeItem | null>();
+/**
+ * Sidebar tree of review threads. Open threads first, then resolved, then
+ * outdated; each shows a file:line location and a status icon.
+ */
+export class TasksViewProvider implements vscode.TreeDataProvider<ThreadTreeItem> {
+  private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<ThreadTreeItem | null>();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  getTreeItem(element: TaskTreeItem): vscode.TreeItem {
+  getTreeItem(element: ThreadTreeItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(): Promise<TaskTreeItem[]> {
+  async getChildren(): Promise<ThreadTreeItem[]> {
     const identity = await resolveWorkspaceIdentity();
     if (identity == null) {
       return [];
     }
-    const store = new TaskStore(identity);
-    const tasks = await store.listTasks();
-    return tasks.map((task) => new TaskTreeItem(task));
+    const store = new ThreadStore(identity);
+    const threads = await store.listThreads();
+    return threads.map((thread) => new ThreadTreeItem(thread));
   }
 
   refresh(): void {
@@ -32,48 +36,55 @@ export class TasksViewProvider implements vscode.TreeDataProvider<TaskTreeItem> 
   }
 }
 
-export class TaskTreeItem extends vscode.TreeItem {
-  constructor(readonly task: Task) {
-    super(task.title, vscode.TreeItemCollapsibleState.None);
+export class ThreadTreeItem extends vscode.TreeItem {
+  constructor(readonly thread: ReviewThread) {
+    super(threadLabel(thread), vscode.TreeItemCollapsibleState.None);
 
-    const filePath = task.anchor.filePath;
+    const filePath = thread.anchor.filePath;
     const fileName = filePath.split('/').pop() ?? filePath;
-    const line = task.anchor.line + 1;
-    const isOrphaned = task.status === 'orphaned' || task.status === 'outdated';
-    const location = `${fileName}:${line}`;
+    const line = thread.anchor.line != null ? thread.anchor.line + 1 : null;
+    const location = line != null ? `${fileName}:${line}` : fileName;
+    const badges: string[] = [];
+    if (thread.status.resolved) {
+      badges.push('resolved');
+    }
+    if (thread.status.outdated) {
+      badges.push('outdated');
+    }
 
-    this.description = task.status === 'open' ? location : `${location} · ${task.status}`;
-    this.tooltip = task.description.length > 0 ? task.description : task.title;
-    this.iconPath = iconForStatus(task.status);
-    this.contextValue = 'fmcTask';
+    this.description = badges.length > 0 ? `${location} · ${badges.join(', ')}` : location;
+    this.tooltip = firstMessagePreview(thread);
+    this.iconPath = iconForThread(thread);
+    this.contextValue = 'fmcThread';
 
-    if (!isOrphaned) {
+    if (!thread.status.outdated) {
       this.command = {
-        command: 'fixMyComments.openTask',
-        title: 'Go to task',
-        arguments: [task],
+        command: 'fixMyComments.openThread',
+        title: 'Go to thread',
+        arguments: [thread],
       };
     }
   }
 }
 
-function iconForStatus(status: Task['status']): vscode.ThemeIcon {
-  switch (status) {
-    case 'resolved':
-      return new vscode.ThemeIcon('pass-filled', new vscode.ThemeColor('charts.green'));
-    case 'closed':
-      return new vscode.ThemeIcon('pass');
-    case 'blocked':
-      return new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('charts.red'));
-    case 'in_progress':
-      return new vscode.ThemeIcon('sync');
-    case 'requires_review':
-      return new vscode.ThemeIcon('eye');
-    case 'orphaned':
-      return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
-    case 'outdated':
-      return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
-    default:
-      return new vscode.ThemeIcon('comment');
+function threadLabel(thread: ReviewThread): string {
+  const fileName = thread.anchor.filePath.split('/').pop() ?? thread.anchor.filePath;
+  const line = thread.anchor.line != null ? `:${thread.anchor.line + 1}` : '';
+  return `${fileName}${line}`;
+}
+
+function firstMessagePreview(_thread: ReviewThread): string {
+  // The tree item's own description carries location + status; the full thread
+  // body is shown inline. Tooltip stays short.
+  return threadLabel(_thread);
+}
+
+function iconForThread(thread: ReviewThread): vscode.ThemeIcon {
+  if (thread.status.resolved) {
+    return new vscode.ThemeIcon('pass-filled', new vscode.ThemeColor('charts.green'));
   }
+  if (thread.status.outdated) {
+    return new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'));
+  }
+  return new vscode.ThemeIcon('comment');
 }

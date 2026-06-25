@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
-import { TaskStore } from '../storage/task-store';
+import { ThreadStore } from '../storage/thread-store';
 import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
 import { AnchorTracker } from '../anchoring/anchor-tracker';
-import type { Task } from '../generated';
+import type { ReviewThread } from '../generated';
 
 export class GutterDecorator implements vscode.Disposable {
   private readonly decorationType: vscode.TextEditorDecorationType;
   private readonly disposables: vscode.Disposable[] = [];
-  private cachedTasks: Task[] | null = null;
+  private cachedThreads: ReviewThread[] | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -39,7 +39,7 @@ export class GutterDecorator implements vscode.Disposable {
   }
 
   refresh(): void {
-    this.cachedTasks = null;
+    this.cachedThreads = null;
     const editor = vscode.window.activeTextEditor;
     if (editor != null) {
       void this.applyToEditor(editor);
@@ -62,19 +62,25 @@ export class GutterDecorator implements vscode.Disposable {
       return;
     }
 
-    if (this.cachedTasks == null) {
+    if (this.cachedThreads == null) {
       const identity = await resolveWorkspaceIdentity();
       if (identity == null) {
         editor.setDecorations(this.decorationType, []);
         return;
       }
-      const store = new TaskStore(identity);
-      this.cachedTasks = await store.listTasks();
+      const store = new ThreadStore(identity);
+      this.cachedThreads = await store.listThreads();
     }
 
-    const ranges = this.cachedTasks
-      .filter((t) => t.anchor.filePath === filePath && t.status === 'open')
-      .map((t) => lineToRange(t.anchor.line));
+    const ranges: vscode.Range[] = [];
+    for (const t of this.cachedThreads) {
+      if (t.anchor.filePath !== filePath || t.anchor.type !== 'line' || t.status.resolved) {
+        continue;
+      }
+      if (t.anchor.line != null) {
+        ranges.push(lineToRange(t.anchor.line));
+      }
+    }
 
     editor.setDecorations(this.decorationType, ranges);
   }
