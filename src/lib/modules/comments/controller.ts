@@ -1,25 +1,14 @@
 import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
-import { ThreadStore } from '../storage/thread-store';
-import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import { buildAnchor } from '../storage/git-info';
-import type { Author, ReviewMessage, ReviewThread } from '../generated';
-import type { TasksViewProvider } from '../views/tasks-view';
+import { ThreadStore } from '../storage';
+import { resolveWorkspaceIdentity } from '../storage';
+import { buildAnchor } from '../storage';
+import type { Author, DraftMode, ReviewMessage, ReviewThread } from '../../../generated';
+import type { TasksViewProvider } from '../tasks';
+import { normalCommentHelper, suggestionHelper, taskHelper } from './comment-helpers';
+import { threadLabel, toComment } from './renderer';
+import { messageIdFromTarget, stripContextPrefix, threadIdFromTarget } from './target-resolver';
 
-type DraftMode = { type: 'task' } | { type: 'suggestion'; originalCode: string };
-
-/**
- * Bitbucket-style native comment threads.
- *
- * - One thread per anchored line. Threads own resolve (native checkbox via
- *   `CommentThreadState`) and an outdated flag (line hash mismatch).
- * - Messages are flat (no nested replies): comment, task (checkbox), or
- *   suggestion. Reactions are an emoji→authorIds map, surfaced through the
- *   native `CommentReaction` API + `reactionHandler`.
- * - Threads are rebuilt from storage on activation and whenever the storage
- *   files change (e.g. an AI agent writes via the MCP server), so comments
- *   survive a VS Code reload and appear live.
- */
 export class FixMyCommentsController implements vscode.Disposable {
   private readonly controller: vscode.CommentController;
   private readonly threadsById = new Map<string, vscode.CommentThread>();
@@ -28,7 +17,6 @@ export class FixMyCommentsController implements vscode.Disposable {
   private readonly activeSuggestionHighlights = new Map<string, vscode.TextEditorDecorationType>();
   private readonly disposables: vscode.Disposable[] = [];
 
-  /** Emoji palette offered by the reaction picker. */
   private static readonly REACTIONS = ['👍', '👎', '🎉', '❤️', '🚀', '👀'];
 
   constructor(
@@ -46,11 +34,9 @@ export class FixMyCommentsController implements vscode.Disposable {
       placeHolder: 'Comment · Enter to submit · Shift+Enter for a new line',
     };
 
-    // Rebuild all threads from storage at startup so comments survive a reload.
     void this.rebuildAllThreads();
   }
 
-  /** Rebuild every thread for the current workspace from disk. */
   async rebuildAllThreads(): Promise<void> {
     const store = await this.resolveStore();
     if (store == null) {
@@ -58,7 +44,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     }
     const threads = await store.listThreads();
 
-    // Dispose threads whose backing record is gone.
     const liveIds = new Set(threads.map((t) => t.id));
     for (const [id, thread] of this.threadsById) {
       if (!liveIds.has(id)) {
@@ -73,7 +58,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     this.tasksProvider.refresh();
   }
 
-  /** Create or refresh a single native thread from a stored record. */
   private async upsertThread(thread: ReviewThread, store: ThreadStore): Promise<void> {
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (folder == null) {
@@ -84,11 +68,9 @@ export class FixMyCommentsController implements vscode.Disposable {
     const range = new vscode.Range(line, 0, line, 0);
 
     const messages = await store.listMessages(thread.id);
-    const comments = messages.map((m) => this.toComment(m));
+    const comments = messages.map((m) => toComment(m));
 
     let native: vscode.CommentThread | null = this.threadsById.get(thread.id) ?? null;
-    // `uri` is read-only on a CommentThread, so if the file path changed (rare)
-    // we dispose and recreate rather than reassign.
     if (native != null && native.uri.toString() !== uri.toString()) {
       native.dispose();
       this.threadsById.delete(thread.id);
@@ -110,7 +92,6 @@ export class FixMyCommentsController implements vscode.Disposable {
       : vscode.CommentThreadState.Unresolved;
   }
 
-  /** Open a comment box on the current line — no selection required. */
   openThread(): void {
     const editor = vscode.window.activeTextEditor;
     if (editor == null) {
@@ -140,17 +121,13 @@ export class FixMyCommentsController implements vscode.Disposable {
     if (existing != null) {
       await this.upsertThread(existing, store);
       const native = this.threadsById.get(existing.id);
-      if (native != null) {
-        native.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
-      }
+      this.expandOnly(native ?? null);
       await this.focusThread(native ?? null);
     } else {
       const created = await this.createEmptyThread(store, document, line);
       await this.upsertThread(created, store);
       const native = this.threadsById.get(created.id);
-      if (native != null) {
-        native.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
-      }
+      this.expandOnly(native ?? null);
       await this.focusThread(native ?? null);
     }
   }
@@ -165,7 +142,7 @@ export class FixMyCommentsController implements vscode.Disposable {
     if (native == null) {
       return;
     }
-    native.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+    this.expandOnly(native);
 
     const document = await vscode.workspace.openTextDocument(native.uri);
     const editor = await vscode.window.showTextDocument(document, { preserveFocus: false });
@@ -176,10 +153,20 @@ export class FixMyCommentsController implements vscode.Disposable {
     await vscode.commands.executeCommand('workbench.action.focusCommentOnCurrentLine');
   }
 
+  private expandOnly(openThread: vscode.CommentThread | null): void {
+    for (const thread of this.threadsById.values()) {
+      thread.collapsibleState =
+        thread === openThread
+          ? vscode.CommentThreadCollapsibleState.Expanded
+          : vscode.CommentThreadCollapsibleState.Collapsed;
+    }
+  }
+
   private async focusThread(thread: vscode.CommentThread | null): Promise<void> {
     if (thread == null) {
       return;
     }
+    this.expandOnly(thread);
     const editor = await vscode.window.showTextDocument(thread.uri, { preserveFocus: false });
     const line = thread.range != null ? thread.range.start.line : 0;
     editor.selection = new vscode.Selection(line, 0, line, 0);
@@ -236,7 +223,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     this.tasksProvider.refresh();
   }
 
-  /** Toggle a thread's resolved checkbox (native thread state). */
   async toggleResolved(target: unknown): Promise<void> {
     const threadId = threadIdFromTarget(target);
     if (threadId == null) {
@@ -266,7 +252,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     this.tasksProvider.refresh();
   }
 
-  /** Show an inline emoji picker helper in the same thread. */
   async pickReaction(target: unknown): Promise<void> {
     const messageId = messageIdFromTarget(target);
     if (messageId == null) {
@@ -300,7 +285,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     }
   }
 
-  /** Add an emoji reaction (or remove the author's existing one) on a message. */
   async toggleReactionOnMessage(messageId: string, emoji: string): Promise<void> {
     const store = await this.resolveStore();
     if (store == null) {
@@ -334,11 +318,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     await this.upsertThread(ownerThread, store);
   }
 
-  /**
-   * Native reaction handler:
-   * - clicking an existing emoji toggles that emoji
-   * - clicking VS Code's add-reaction (+/smiley) opens our inline emoji helper
-   */
   private async toggleReaction(
     comment: vscode.Comment,
     reaction: vscode.CommentReaction,
@@ -369,7 +348,7 @@ export class FixMyCommentsController implements vscode.Disposable {
     if (threadId == null) {
       return;
     }
-    this.draftModesByThreadId.set(threadId, { type: 'task' });
+    this.draftModesByThreadId.set(threadId, { type: 'task', originalCode: null });
     this.clearSuggestionHighlight(threadId);
     await this.focusThreadForDraft(threadId, taskHelper());
   }
@@ -393,7 +372,7 @@ export class FixMyCommentsController implements vscode.Disposable {
       return;
     }
     if (mode.type === 'suggestion') {
-      this.draftModesByThreadId.set(threadId, { type: 'task' });
+      this.draftModesByThreadId.set(threadId, { type: 'task', originalCode: null });
       this.clearSuggestionHighlight(threadId);
       await this.focusThreadForDraft(threadId, taskHelper());
       return;
@@ -567,14 +546,10 @@ export class FixMyCommentsController implements vscode.Disposable {
     }
     const native = this.threadsById.get(threadId) ?? null;
     if (native != null) {
-      try {
-        const document = await vscode.workspace.openTextDocument(native.uri);
-        const line = thread.anchor.line ?? native.range?.start.line ?? 0;
-        if (line >= 0 && line < document.lineCount) {
-          return document.lineAt(line).text;
-        }
-      } catch {
-        // Fall back to the stored snippet below.
+      const document = await vscode.workspace.openTextDocument(native.uri);
+      const line = thread.anchor.line ?? native.range?.start.line ?? 0;
+      if (line >= 0 && line < document.lineCount) {
+        return document.lineAt(line).text;
       }
     }
     return thread.anchor.snippet ?? '';
@@ -598,7 +573,7 @@ export class FixMyCommentsController implements vscode.Disposable {
       ...native.comments.filter((c) => c.contextValue !== `helper:${threadId}`),
       helper,
     ];
-    native.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+    this.expandOnly(native);
   }
 
   private async appendDraftModeMessage(
@@ -619,7 +594,7 @@ export class FixMyCommentsController implements vscode.Disposable {
       type: 'suggestion',
       markdown: 'Suggested change',
       suggestion: {
-        originalCode: mode.originalCode,
+        originalCode: mode.originalCode ?? '',
         suggestedCode: text,
         applied: false,
         appliedBy: null,
@@ -686,7 +661,7 @@ export class FixMyCommentsController implements vscode.Disposable {
     thread.contextValue = `thread:${threadId}`;
     thread.label = threadLabel(reviewThread);
     thread.state = vscode.CommentThreadState.Unresolved;
-    thread.comments = [this.toComment(message)];
+    thread.comments = [toComment(message)];
     this.threadsById.set(threadId, thread);
   }
 
@@ -703,7 +678,7 @@ export class FixMyCommentsController implements vscode.Disposable {
       task: null,
     });
     const messages = await store.listMessages(threadId);
-    thread.comments = messages.map((m) => this.toComment(m));
+    thread.comments = messages.map((m) => toComment(m));
     this.threadsById.set(threadId, thread);
   }
 
@@ -768,29 +743,6 @@ export class FixMyCommentsController implements vscode.Disposable {
     return null;
   }
 
-  /** Map a stored message to a native VS Code Comment, including reactions. */
-  private toComment(message: ReviewMessage): vscode.Comment {
-    const label =
-      message.author.type === 'ai'
-        ? '🤖'
-        : message.type === 'task'
-          ? message.task?.completed
-            ? '✅'
-            : '☐'
-          : null;
-    const comment: vscode.Comment = {
-      author: { name: message.author.name },
-      body: renderMessageBody(message),
-      mode: vscode.CommentMode.Preview,
-      contextValue: `${message.type}:${message.id}`,
-      timestamp: new Date(message.metadata.createdAt),
-    };
-    if (label != null) {
-      comment.label = label;
-    }
-    return comment;
-  }
-
   private async resolveStore(): Promise<ThreadStore | null> {
     const identity = await resolveWorkspaceIdentity();
     if (identity == null) {
@@ -819,19 +771,6 @@ function currentUser(): Author {
   return { type: 'user', id: 'You', name: 'You' };
 }
 
-function threadLabel(thread: ReviewThread): string {
-  const fileName = thread.anchor.filePath.split('/').pop() ?? thread.anchor.filePath;
-  const line = thread.anchor.line != null ? `:${thread.anchor.line + 1}` : '';
-  const tags: string[] = [];
-  if (thread.status.resolved) {
-    tags.push('resolved');
-  }
-  if (thread.status.outdated) {
-    tags.push('outdated');
-  }
-  return tags.length > 0 ? `${fileName}${line} [${tags.join(', ')}]` : `${fileName}${line}`;
-}
-
 function fallbackAnchor(uri: vscode.Uri, line: number): ReviewThread['anchor'] {
   return {
     type: 'line',
@@ -840,107 +779,4 @@ function fallbackAnchor(uri: vscode.Uri, line: number): ReviewThread['anchor'] {
     lineHash: '',
     snippet: null,
   };
-}
-
-function normalCommentHelper(): string {
-  return '💬 **Normal comment**\n\nUse this for a regular discussion note. Enter your message below, then press Enter or click 💬 Add Comment.';
-}
-
-function taskHelper(): string {
-  return '📝 **Task**\n\nUse this for a checkbox item someone should complete. Enter the task text below, then press Enter or click 💬 Add Comment.';
-}
-
-function suggestionHelper(originalCode: string): string {
-  const suffix = originalCode.length > 0 ? `\n\n\`\`\`\n${escapeFence(originalCode)}\n\`\`\`` : '';
-  return `💡 **Suggestion**\n\nUse this to propose replacement code. Edit the highlighted current line below, then press Enter or click 💬 Add Comment.${suffix}`;
-}
-
-function renderMessageBody(message: ReviewMessage): vscode.MarkdownString {
-  const body = new vscode.MarkdownString('', true);
-  body.isTrusted = true;
-  body.supportThemeIcons = true;
-  if (message.task != null) {
-    body.appendMarkdown(
-      `${message.task.completed ? '- [x]' : '- [ ]'} ${message.content.markdown}`,
-    );
-    appendInlineReactionBar(body, message);
-    return body;
-  }
-  body.appendMarkdown(message.content.markdown);
-  if (message.suggestion != null) {
-    body.appendMarkdown('\n\n**Original**\n');
-    body.appendCodeblock(message.suggestion.originalCode, '');
-    body.appendMarkdown('\n**Suggested**\n');
-    body.appendCodeblock(message.suggestion.suggestedCode, '');
-  }
-  appendInlineReactionBar(body, message);
-  return body;
-}
-
-function escapeFence(value: string): string {
-  return value.replace(/```/g, '``\\`');
-}
-
-function appendInlineReactionBar(body: vscode.MarkdownString, message: ReviewMessage): void {
-  const links: string[] = [];
-  for (const [emoji, authors] of Object.entries(message.reactions)) {
-    if (authors.length === 0) {
-      continue;
-    }
-    const args = encodeURIComponent(JSON.stringify([message.id, emoji]));
-    links.push(
-      `[${emoji}${authors.length > 1 ? ` ${authors.length}` : ''}](command:fixMyComments.chooseReaction?${args})`,
-    );
-  }
-  const addArgs = encodeURIComponent(JSON.stringify([`${message.type}:${message.id}`]));
-  links.push(`[$(smiley)](command:fixMyComments.react?${addArgs} "Add reaction")`);
-  body.appendMarkdown(`\n\n${links.join('  ')}`);
-}
-
-function threadIdFromTarget(target: unknown): string | null {
-  if (typeof target !== 'object' || target === null) {
-    return null;
-  }
-  if ('thread' in target) {
-    const thread = target.thread;
-    if (
-      typeof thread === 'object' &&
-      thread !== null &&
-      'contextValue' in thread &&
-      typeof thread.contextValue === 'string'
-    ) {
-      return stripContextPrefix(thread.contextValue);
-    }
-  }
-  if ('contextValue' in target && typeof target.contextValue === 'string') {
-    return stripContextPrefix(target.contextValue);
-  }
-  if ('id' in target && typeof target.id === 'string') {
-    return target.id;
-  }
-  return null;
-}
-
-function messageIdFromTarget(target: unknown): string | null {
-  if (typeof target === 'string') {
-    return stripContextPrefix(target);
-  }
-  if (typeof target !== 'object' || target === null) {
-    return null;
-  }
-  if ('contextValue' in target && typeof target.contextValue === 'string') {
-    return stripContextPrefix(target.contextValue);
-  }
-  if ('id' in target && typeof target.id === 'string') {
-    return target.id;
-  }
-  return null;
-}
-
-function stripContextPrefix(contextValue: string): string {
-  const index = contextValue.indexOf(':');
-  if (index === -1) {
-    return contextValue;
-  }
-  return contextValue.slice(index + 1);
 }

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { ThreadStore } from '../storage/thread-store';
-import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import { AnchorTracker } from '../anchoring/anchor-tracker';
-import type { ReviewThread } from '../generated';
+import { ThreadStore } from '../storage';
+import { resolveWorkspaceIdentity } from '../storage';
+import { AnchorTracker } from '../anchoring';
+import type { ReviewThread } from '../../../generated';
 
 export class GutterDecorator implements vscode.Disposable {
   private readonly decorationType: vscode.TextEditorDecorationType;
@@ -14,7 +14,7 @@ export class GutterDecorator implements vscode.Disposable {
     private readonly tracker: AnchorTracker,
   ) {
     this.decorationType = vscode.window.createTextEditorDecorationType({
-      gutterIconPath: context.asAbsolutePath('resources/gutter-comment.svg'),
+      gutterIconPath: context.asAbsolutePath('assets/images/gutter-comment.svg'),
       gutterIconSize: 'contain',
     });
 

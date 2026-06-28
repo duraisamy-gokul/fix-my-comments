@@ -1,0 +1,15 @@
+Comment:
+  DraftModeType:
+    type: string
+    enum:
+      - task
+      - suggestion
+
+  DraftMode:
+    type: object
+    required: [type]
+    properties:
+      type:
+        $ref: './types/comment.yaml#/Comment/DraftModeType'
+      originalCode:
+        type: string

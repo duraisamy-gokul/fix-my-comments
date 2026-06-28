@@ -1,0 +1,27 @@
+Anchoring:
+  AnchorState:
+    type: string
+    enum:
+      - valid
+      - outdated
+      - orphaned
+
+  RecoveryResult:
+    type: object
+    required: [state]
+    properties:
+      state:
+        $ref: './types/anchoring.yaml#/Anchoring/AnchorState'
+      line:
+        type: number
+
+  LineContentChange:
+    type: object
+    required: [filePath, threadId, line]
+    properties:
+      filePath:
+        type: string
+      threadId:
+        type: string
+      line:
+        type: number

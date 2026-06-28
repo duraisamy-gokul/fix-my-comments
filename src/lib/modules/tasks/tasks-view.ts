@@ -1,12 +1,8 @@
 import * as vscode from 'vscode';
-import { ThreadStore } from '../storage/thread-store';
-import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import type { ReviewThread } from '../generated';
+import { ThreadStore } from '../storage';
+import { resolveWorkspaceIdentity } from '../storage';
+import type { ReviewThread } from '../../../generated';
 
-/**
- * Sidebar tree of review threads. Open threads first, then resolved, then
- * outdated; each shows a file:line location and a status icon.
- */
 export class TasksViewProvider implements vscode.TreeDataProvider<ThreadTreeItem> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<ThreadTreeItem | null>();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
@@ -74,8 +70,6 @@ function threadLabel(thread: ReviewThread): string {
 }
 
 function firstMessagePreview(_thread: ReviewThread): string {
-  // The tree item's own description carries location + status; the full thread
-  // body is shown inline. Tooltip stays short.
   return threadLabel(_thread);
 }
 

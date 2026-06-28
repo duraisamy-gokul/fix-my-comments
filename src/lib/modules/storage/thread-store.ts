@@ -1,30 +1,18 @@
 import * as vscode from 'vscode';
-import { decodeThreadFile, decodeReviewMessageFile } from '../generated';
+import { decodeThreadFile, decodeReviewMessageFile } from '../../../generated';
 import type {
   ReviewMessage,
   ReviewThread,
   ThreadFile,
   ReviewMessageFile,
   WorkspaceIdentity,
-} from '../generated';
+} from '../../../generated';
 
 const EMPTY_THREADS: ThreadFile = { schemaVersion: 1, threads: [] };
 const EMPTY_MESSAGES: ReviewMessageFile = { schemaVersion: 1, messages: [] };
 
-/**
- * Backing store for the Bitbucket-style review model: a lightweight
- * {@link ReviewThread} record (anchor + resolve/outdated state) and an
- * append-only {@link ReviewMessage} log. Threads and messages live in
- * separate files but share the same per-repo+branch storage directory.
- *
- * Threads are keyed by id; messages are filtered by threadId and kept in
- * `seq`-free chronological order — the array order is the thread order, and
- * appending a reply pushes one record instead of rewriting the thread.
- */
 export class ThreadStore {
   constructor(private readonly identity: WorkspaceIdentity) {}
-
-  // ── Threads ──────────────────────────────────────────────────────────────
 
   async listThreads(): Promise<ReviewThread[]> {
     return (await this.readThreads()).threads;
@@ -51,8 +39,6 @@ export class ThreadStore {
     data.threads = data.threads.filter((thread) => thread.id !== id);
     await this.writeThreads(data);
   }
-
-  // ── Messages ────────────────────────────────────────────────────────────
 
   async listMessages(threadId: string): Promise<ReviewMessage[]> {
     const data = await this.readMessages();
@@ -83,8 +69,6 @@ export class ThreadStore {
     data.messages = data.messages.filter((message) => message.threadId !== threadId);
     await this.writeMessages(data);
   }
-
-  // ── Storage plumbing ────────────────────────────────────────────────────
 
   private get directory(): vscode.Uri {
     return vscode.Uri.file(this.identity.storagePath);

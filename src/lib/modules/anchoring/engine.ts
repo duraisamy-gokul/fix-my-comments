@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { ThreadStore } from '../storage/thread-store';
-import { resolveWorkspaceIdentity } from '../storage/workspace-identity';
-import { checkAnchor } from '../anchoring/anchor-recovery';
-import { AnchorTracker } from '../anchoring/anchor-tracker';
-import type { ReviewThread } from '../generated';
-import type { TasksViewProvider } from '../views/tasks-view';
+import { ThreadStore } from '../storage';
+import { resolveWorkspaceIdentity } from '../storage';
+import { checkAnchor } from './recovery';
+import { AnchorTracker } from './tracker';
+import type { ReviewThread } from '../../../generated';
+import type { TasksViewProvider } from '../tasks';
 
 export class AnchorEngine implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
@@ -70,9 +70,6 @@ export class AnchorEngine implements vscode.Disposable {
           });
         }
       } else if (result.state === 'orphaned') {
-        // Orphaned is represented as outdated with a stale line; there is no
-        // separate orphaned flag in the Bitbucket-style status. We mark
-        // outdated so the thread surfaces for the user to resolve or recreate.
         if (!thread.status.outdated) {
           updates.push({
             ...thread,
@@ -91,7 +88,6 @@ export class AnchorEngine implements vscode.Disposable {
     }
   }
 
-  /** Live: the commented line's own content changed → mark the thread outdated. */
   private async onLineContentChanged(change: {
     filePath: string;
     threadId: string;
@@ -143,8 +139,6 @@ export class AnchorEngine implements vscode.Disposable {
       if (liveLine == null || liveLine === thread.anchor.line) {
         continue;
       }
-      // The line shifted during the session; persist the new line number.
-      // Re-check content too, since the save may have changed the line's text.
       const anchor = { ...thread.anchor, line: liveLine };
       const result = checkAnchor(document, anchor);
       const outdated = result.state === 'outdated' || result.state === 'orphaned';

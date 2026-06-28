@@ -7,3 +7,7 @@ groupedTypes:
     $ref: './types/task.yaml#/Task'
   Storage:
     $ref: './types/storage.yaml#/Storage'
+  Anchoring:
+    $ref: './types/anchoring.yaml#/Anchoring'
+  Comment:
+    $ref: './types/comment.yaml#/Comment'
