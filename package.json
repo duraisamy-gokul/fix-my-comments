@@ -2,11 +2,11 @@
   "name": "fix-my-comments",
   "displayName": "Fix My Comments",
   "description": "AI-powered task management and collaboration layer attached directly to source code.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "Gokul-duraisamy",
   "private": true,
   "license": "MIT",
-  "icon": "resources/icon.png",
+  "icon": "assets/icons/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/duraisamy-gokul/fix-my-comments.git"
@@ -224,7 +224,7 @@
         {
           "id": "fixMyComments",
           "title": "Fix My Comments",
-          "icon": "resources/fix-my-comments.svg"
+          "icon": "assets/icons/fix-my-comments.svg"
         }
       ]
     },

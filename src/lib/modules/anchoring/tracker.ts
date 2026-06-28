@@ -1,17 +1,7 @@
 import * as vscode from 'vscode';
-import { hashLine } from '../storage/git-info';
-import type { ReviewThread } from '../generated';
+import { hashLine } from '../storage';
+import type { LineContentChange, ReviewThread } from '../../../generated';
 
-/**
- * Tracks the live line number of each thread's anchor while a file is open.
- *
- * The line number is a *cache*, never the identity — the identity is the line
- * hash. When edits happen above a commented line (insert/delete lines), we
- * shift the stored line so the comment follows its line through an editing
- * session. When the commented line's *own* content changes, we surface it via
- * the {@link onLineContentChanged} event so the engine can mark the thread
- * outdated — that is a content change, not a shift.
- */
 export class AnchorTracker implements vscode.Disposable {
   private readonly liveLines = new Map<string, Map<string, number>>();
   private readonly lineHashes = new Map<string, Map<string, string>>();
@@ -19,7 +9,7 @@ export class AnchorTracker implements vscode.Disposable {
   private readonly disposable: vscode.Disposable;
 
   private readonly onLineContentChangedEmitter = new vscode.EventEmitter<LineContentChange>();
-  /** Fired when a tracked line's own text changes (hash mismatch), not a shift. */
+
   readonly onLineContentChanged = this.onLineContentChangedEmitter.event;
 
   constructor() {
@@ -99,8 +89,6 @@ export class AnchorTracker implements vscode.Disposable {
       if (after !== before) {
         lineMap.set(threadId, after);
       }
-      // Detect a content change on the commented line itself: the line number
-      // didn't shift, but the text on it changed (hash mismatch → outdated).
       if (after === before && hashMap != null) {
         const storedHash = hashMap.get(threadId);
         if (
@@ -128,17 +116,6 @@ export class AnchorTracker implements vscode.Disposable {
   }
 }
 
-export type LineContentChange = {
-  filePath: string;
-  threadId: string;
-  line: number;
-};
-
-/**
- * Shift a single line number across a set of document content changes.
- * Edits that end above the line move it; edits within the line's own row are
- * content changes (handled by hash detection, not a shift).
- */
 function shiftLine(
   line: number,
   changes: readonly vscode.TextDocumentContentChangeEvent[],
@@ -151,12 +128,8 @@ function shiftLine(
     if (delta === 0) {
       continue;
     }
-    // An edit strictly above this line shifts it.
     if (change.range.end.line < shifted) {
       shifted += delta;
-    } else if (change.range.start.line <= shifted && change.range.end.line >= shifted) {
-      // Edit overlaps the commented line itself — content changed. Leave the
-      // line number; hash detection will mark it outdated.
     }
   }
   if (shifted < 0) {
