@@ -85,7 +85,7 @@ export class FixMyCommentsController implements vscode.Disposable {
       native.range = range;
       native.comments = comments;
     }
-    native.canReply = !thread.status.resolved;
+    native.canReply = true;
     native.label = threadLabel(thread);
     native.state = thread.status.resolved
       ? vscode.CommentThreadState.Resolved
@@ -197,14 +197,6 @@ export class FixMyCommentsController implements vscode.Disposable {
 
     const threadId = thread.contextValue != null ? stripContextPrefix(thread.contextValue) : null;
     if (threadId != null && threadId.length > 0) {
-      const backing = await store.getThread(threadId);
-      if (backing != null && backing.status.resolved) {
-        void vscode.window.showWarningMessage(
-          'This thread is resolved. Reopen it before adding a reply.',
-        );
-        thread.dispose();
-        return;
-      }
       const mode = this.draftModesByThreadId.get(threadId) ?? null;
       if (mode != null) {
         await this.appendDraftModeMessage(threadId, mode, trimmed);
@@ -699,13 +691,17 @@ export class FixMyCommentsController implements vscode.Disposable {
     if (backing == null) {
       return;
     }
-    if (backing.status.resolved) {
-      void vscode.window.showWarningMessage(
-        'This thread is resolved. Reopen it before adding messages.',
-      );
-      return;
-    }
     const now = new Date().toISOString();
+    const updatedThread: ReviewThread = {
+      ...backing,
+      status: {
+        ...backing.status,
+        resolved: false,
+        resolvedBy: null,
+        resolvedAt: null,
+      },
+      metadata: { ...backing.metadata, updatedAt: now },
+    };
     const message: ReviewMessage = {
       id: `msg_${randomUUID()}`,
       threadId,
@@ -718,14 +714,8 @@ export class FixMyCommentsController implements vscode.Disposable {
       metadata: { createdAt: now, updatedAt: now, editedAt: null },
     };
     await store.appendMessage(message);
-    await store.saveThread({
-      ...backing,
-      metadata: { ...backing.metadata, updatedAt: now },
-    });
-    await this.upsertThread(
-      { ...backing, metadata: { ...backing.metadata, updatedAt: now } },
-      store,
-    );
+    await store.saveThread(updatedThread);
+    await this.upsertThread(updatedThread, store);
   }
 
   private async findMessage(
